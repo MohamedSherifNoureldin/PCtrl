@@ -74,6 +74,7 @@ fn Update_Procs(pidTable: &mut HashMap, procs: &mut Vec<Process>) {
     let me = procfs::process::Process::myself().unwrap();
     let me_stat = me.stat().unwrap();
     let tps = procfs::ticks_per_second().unwrap();
+    let child_queue: Vec<(i32, i32)> = Vec::new(); // ppid, pid
 
     println!("ttr_nr is {}", me_stat.tty_nr);
     println!("{: >5} {: <8} {: >8} {}", "PID", "TTY", "TIME", "CMD");
@@ -109,6 +110,14 @@ fn Update_Procs(pidTable: &mut HashMap, procs: &mut Vec<Process>) {
         procs[i].owner = get_user_by_uid(prc.uid().unwrap()).unwrap().name();
         procs[i].group = get_group_by_gid(stat.pgrp).unwrap().name();
         procs[i].run_duration = (stat.utime / ticks_per_second()) as u32;
+        if (stat.ppid > 0) {
+            if (pidTable.contains_key(&stat.ppid)) {
+                procs[pidTable[stat.ppid]].children.push(stat.pid);
+            }
+            else {
+                child_queue.push((stat.ppid, stat.pid));
+            }
+        }
         // children: Vec<u32>,
         // OpenFileDesc: Vec<String>,
         Log_Data(procs[i].RAM_hist, prc.statm().unwrap().size * 4); // size in Kb  
@@ -129,6 +138,10 @@ fn Update_Procs(pidTable: &mut HashMap, procs: &mut Vec<Process>) {
                 stat.pid, tty, total_time, stat.comm
             );
         }
+    }
+    // chech missed children procs assignment
+    for entry in child_queue {
+        procs[ pidTable[entry.0] ].children.push(entry.1); // add missing children 
     }
 }
 fn main() {

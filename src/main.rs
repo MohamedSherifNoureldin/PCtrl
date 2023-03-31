@@ -32,10 +32,12 @@ struct Process {
     open_fds: u16,
     run_duration: u32,
     dir: PathBuf, // program location as a pathbuf  
+
                   //do .into_os_string().into_string().unwrap() to convert to string
     
+    _prev_duration: u64,
     //Data Record
-    CPU_hist:  LinkedList<u8>,
+    CPU_hist:  LinkedList<f32>,
     RAM_hist:  LinkedList<u32>,  //   units is megabytes
     DISK_hist: LinkedList<u32>,  //   units is megabytes
     NET_hist:  LinkedList<u32>,  //   units is megabytes
@@ -65,11 +67,13 @@ struct SysStats {
     user_proc_count: u32,
 
     // Records
-    CPU_hist: LinkedList<Vec<u8>>, // vector of usage per cpu core
+    CPU_hist: LinkedList<Vec<f32>>, // vector of usage per cpu core
     RAM_hist:  LinkedList<u32>,
     DISK_hist:  LinkedList<u32>, // change type according to units
     NET_hist:  LinkedList<u32>, // change type according to units
     SWAP_hist:  LinkedList<u16>,
+
+    _cpu_total: u64,
 }
 
 #[derive(Copy, Clone)]
@@ -113,6 +117,18 @@ fn Update_Procs(pidTable: &mut HashMap<i32, u16>, procs: &mut Vec<Process>, sys_
     let mut total_net = 0;
     let _tty = format!("pty/{}", me_stat.tty_nr().1);
     let mut proc_count =0;
+
+    let mut cpu_count: u8 = 0;
+    let mut cpus_usage :Vec<f32> = Vec::new();
+    let mut cpu_total =0;
+    for cpu in procfs::KernelStats::new().unwrap().cpu_time {
+    	let mut prev:f32 = 0.0;
+    	if (sys_stats.CPU_hist.len() > 0) { prev= sys_stats.CPU_hist.front().unwrap()[cpu_count as usize]}
+        cpus_usage.push( ((cpu.idle as f32 - prev/100.0 * config.update_freq) /config.update_freq*100.0) );
+        cpu_count += 1;
+        cpu_total += cpu.user + cpu.nice+cpu.system+cpu.idle+cpu.iowait.unwrap_or(0)+cpu.irq.unwrap_or(0)+cpu.softirq.unwrap_or(0)+cpu.steal.unwrap_or(0)+cpu.guest.unwrap_or(0)+cpu.guest_nice.unwrap_or(0);
+    }
+
     for prc in procfs::process::all_processes().unwrap() {
         let prc = prc.unwrap();
         let stat = prc.stat().unwrap();
@@ -135,8 +151,8 @@ fn Update_Procs(pidTable: &mut HashMap<i32, u16>, procs: &mut Vec<Process>, sys_
             let newproc : Process = Process::default();
             procs.push(newproc);
         }
-        let prev_duration = ((procs[i].run_duration as i64 * tps as i64) as i128 - ((stat.cutime + stat.cstime) as i64 + stat.guest_time.unwrap() as i64) as i128);
-
+        //let prev_duration = ((procs[i].run_duration as i64 * tps as i64)  - ((stat.cutime + stat.cstime) as i64 + stat.guest_time.unwrap() as i64));
+        
         // Read Proc data
         procs[i].state.procstate = stat.state().unwrap();
         procs[i].name = stat.comm;
@@ -148,6 +164,10 @@ fn Update_Procs(pidTable: &mut HashMap<i32, u16>, procs: &mut Vec<Process>, sys_
         procs[i].owner = get_user_by_uid(prc.uid().unwrap()).unwrap().name().to_str().unwrap().to_string();
         procs[i].group = get_group_by_gid(stat.pgrp as u32).unwrap_or(Group::new(0, "none")).name().to_str().unwrap().to_string();
         procs[i].open_fds = prc.fd_count().unwrap() as u16;
+
+        // assert_eq!(procs[i].run_duration, (stat.utime + stat.stime + stat.cutime as u64 + stat.cstime as u64 + stat.guest_time.unwrap_or_default() / tps));
+        // assert_eq!((stat.utime+stat.stime) as i64, ((procs[i].run_duration as u64 * tps) as u64 - ((stat.cutime + stat.cstime) as u64 + stat.guest_time.unwrap())) as i64);
+
         if stat.ppid > 0 { // parent-child relating
             if pidTable.contains_key(&stat.ppid) {
                 procs[pidTable[&stat.ppid] as usize].children.push(stat.pid as u32);
@@ -157,9 +177,10 @@ fn Update_Procs(pidTable: &mut HashMap<i32, u16>, procs: &mut Vec<Process>, sys_
             }
         }
         
-        
+        let prev_duration = procs[i]._prev_duration;
         Log_Data(&mut procs[i].RAM_hist, (prc.statm().unwrap().size / 256) as u32, config); // size in mb 
-        Log_Data(&mut procs[i].CPU_hist, (((stat.utime+stat.stime)as i128 - prev_duration) as f32 /config.update_freq *100.0) as u8, config); // cpu percent time utilization
+        Log_Data(&mut procs[i].CPU_hist, (100.0 * ((stat.utime+stat.stime) - prev_duration) as f32 / (cpu_total - sys_stats._cpu_total) as f32 / cpu_count as f32), config); // cpu percent time utilization
+        //Log_Data(&mut procs[i].CPU_hist, (((stat.utime+stat.stime)as i128 - prev_duration) as f32 /config.update_freq *100.0) as u8, config); // cpu percent time utilization
         Log_Data(&mut procs[i].DISK_hist, (prc.io().unwrap().write_bytes/(1024*1024)) as u32, config); // cpu percent time utilization
         Log_Data(&mut procs[i].SWAP_hist, (stat.nswap /256) as u16, config); //swap in mb
         
@@ -172,6 +193,7 @@ fn Update_Procs(pidTable: &mut HashMap<i32, u16>, procs: &mut Vec<Process>, sys_
         Log_Data(&mut procs[i].NET_hist, netsum, config); //network usage in kb
 
         let _diskstats = procfs::diskstats().unwrap();
+        procs[i]._prev_duration = (stat.utime+stat.stime);
     }
     // check for any missed children procs assignment
     for entry in child_queue {
@@ -180,14 +202,8 @@ fn Update_Procs(pidTable: &mut HashMap<i32, u16>, procs: &mut Vec<Process>, sys_
 
     // UPDATE SYSTEM DATA
     sys_stats.uptime = procfs::Uptime::new().unwrap().uptime;
-    let mut cpu_count: u8 = 0;
-    let mut cpus_usage :Vec<u8> = Vec::new();
-    for cpu in procfs::KernelStats::new().unwrap().cpu_time {
-    	let mut prev = 0;
-    	if (sys_stats.CPU_hist.len() > 0) { prev= sys_stats.CPU_hist.front().unwrap()[cpu_count as usize]}
-        cpus_usage.push( ((cpu.idle as f32 - prev as f32/100.0 * config.update_freq) /config.update_freq*100.0) as u8);
-        cpu_count += 1;
-    }
+    
+    
     Log_Data(&mut sys_stats.CPU_hist, cpus_usage, config);
     Log_Data(&mut sys_stats.RAM_hist ,((procfs::Meminfo::new().unwrap().mem_total - procfs::Meminfo::new().unwrap().mem_free) / 1024) as u32, config);
     let mut sum = 0;
@@ -212,6 +228,7 @@ fn Update_Procs(pidTable: &mut HashMap<i32, u16>, procs: &mut Vec<Process>, sys_
     let model_name = cpuinfo.lines().find(|line| line.starts_with("model name")).unwrap_or_default();
     let model_name = model_name.split(":").nth(1).unwrap_or_default().trim();
     sys_stats.CPU_Name = (*model_name).to_string();
+    sys_stats._cpu_total = cpu_total;
     //println!("CPU model name: {}", model_name);
 
     // println!("CPU frequency: {:.2} GHz", freq);
@@ -259,6 +276,7 @@ fn test_update_procs() {
         DISK_hist: LinkedList::new(),
         NET_hist: LinkedList::new(),
         SWAP_hist: LinkedList::new(),
+        _cpu_total:0,
     };
     let config = Config { record_length: 5, update_freq: 1.0 };
     Update_Procs(&mut pidTable, &mut procs, &mut sys_stats, config);
@@ -268,7 +286,7 @@ fn test_update_procs() {
     println!("{: >8} {: >8} {: >8} {: >8} {: >8} {: >8}", "PID", "PPID", "CMD", "CPU", "OWNER", "DIR");
     
     for prc in procs {
-        println!("{: <8} {: <8} {: <8} {: <8} {: <8} {: <8}", prc.PID, prc.parent_PID, prc.name, prc.CPU_hist.front().unwrap(), prc.owner, prc.dir.display());
+        println!("{: <8} {: <8} {: <8} {:.1} {: <8} {: <8}", prc.PID, prc.parent_PID, prc.name, prc.CPU_hist.front().unwrap(), prc.owner, prc.dir.display());
     }
     
 }

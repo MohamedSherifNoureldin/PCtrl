@@ -35,11 +35,11 @@ struct Process {
                   //do .into_os_string().into_string().unwrap() to convert to string
     
     //Data Record
-    CPU_hist: LinkedList<u8>,
-    RAM_hist: LinkedList<u32>,   //   units is megabytes
-    DISK_hist: LinkedList<u32>, //   units is megabytes
-    NET_hist: LinkedList<u32>,  //   units is megabytes
-    SWAP_hist: LinkedList<u16>,//   units is megabytes
+    CPU_hist:  LinkedList<u8>,
+    RAM_hist:  LinkedList<u32>,  //   units is megabytes
+    DISK_hist: LinkedList<u32>,  //   units is megabytes
+    NET_hist:  LinkedList<u32>,  //   units is megabytes
+    SWAP_hist: LinkedList<u16>, //   units is megabytes
 }
 
 struct p_state{
@@ -95,11 +95,9 @@ impl Config {
 // main structures
 
 fn Log_Data<T>(list: &mut LinkedList<T>, val:T, config: Config) { // all stat data entry should be through this function 
-    
     if list.len() == config.record_length as usize {
         list.cursor_back_mut().remove_current();
     }
-    
     list.push_front(val);
 }
 
@@ -231,14 +229,13 @@ fn main() {
     let _config : Config = Config::start();
 
     // arrays of indices sorted per each stat
-    let _MemSort : Vec<u32> = Vec::new(); // contains the indices of processes relative to the processes vector, sorted in their respective order
-    let _CPUSort : Vec<u32> = Vec::new(); // processes[ memsort[0] ]  = max memory usage
-    let _DiskSort : Vec<u32> = Vec::new();
-    let _NETSort : Vec<u32> = Vec::new();
-    let _PrioritySort : Vec<u32> = Vec::new();
-    let _PrioritySort : Vec<u32> = Vec::new();
+    let _mem_sort : Vec<u32> = Vec::new(); // contains the indices of processes relative to the processes vector, sorted in their respective order
+    let _cpu_sort : Vec<u32> = Vec::new(); // processes[ memsort[0] ]  = max memory usage
+    let _disk_sort : Vec<u32> = Vec::new();
+    let _net_sort : Vec<u32> = Vec::new();
+    let _priority_sort : Vec<u32> = Vec::new();
 
-    let mut _timeStep : u16; // milliseconds between each data refresh
+
 
     println!("Hello, world!");
     
@@ -271,7 +268,7 @@ fn test_update_procs() {
     println!("{: >8} {: >8} {: >8} {: >8} {: >8} {: >8}", "PID", "PPID", "CMD", "CPU", "OWNER", "DIR");
     
     for prc in procs {
-        println!("{: >8} {: >8} {: >8} {: >8} {: >8} {: >8}", prc.PID, prc.parent_PID, prc.name, prc.CPU_hist.front().unwrap(), prc.owner, prc.dir.display());
+        println!("{: <8} {: <8} {: <8} {: <8} {: <8} {: <8}", prc.PID, prc.parent_PID, prc.name, prc.CPU_hist.front().unwrap(), prc.owner, prc.dir.display());
     }
     
 }

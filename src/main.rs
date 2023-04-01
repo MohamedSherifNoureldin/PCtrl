@@ -10,6 +10,7 @@ use users::{get_user_by_uid, get_group_by_gid, Group}; // libraru for linux user
 use procfs::{process::{ProcState}}; // proc reading library
 
 
+
 // trait ProccessFn { // process functions here
 //     fn getCPU(&self);
 //     fn getRAM(&self);
@@ -163,8 +164,11 @@ fn Update_Procs(pidTable: &mut HashMap<i32, u16>, procs: &mut Vec<Process>, sys_
         procs[i].dir = prc.exe().unwrap_or_default();
         procs[i].owner = get_user_by_uid(prc.uid().unwrap()).unwrap().name().to_str().unwrap().to_string();
         procs[i].group = get_group_by_gid(stat.pgrp as u32).unwrap_or(Group::new(0, "none")).name().to_str().unwrap().to_string();
-        procs[i].open_fds = prc.fd_count().unwrap() as u16;
-
+        let fdcout = match prc.fd_count() {
+            Ok(fdcount) => {procs[i].open_fds = prc.fd_count().unwrap() as u16; // only for root user
+            },
+            Err(e) => {},
+        };
         // assert_eq!(procs[i].run_duration, (stat.utime + stat.stime + stat.cutime as u64 + stat.cstime as u64 + stat.guest_time.unwrap_or_default() / tps));
         // assert_eq!((stat.utime+stat.stime) as i64, ((procs[i].run_duration as u64 * tps) as u64 - ((stat.cutime + stat.cstime) as u64 + stat.guest_time.unwrap())) as i64);
 

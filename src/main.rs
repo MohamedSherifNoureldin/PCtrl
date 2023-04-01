@@ -178,21 +178,35 @@ fn Update_Procs(pidTable: &mut HashMap<i32, u16>, procs: &mut Vec<Process>, sys_
         }
         
         let prev_duration = procs[i]._prev_duration;
-        Log_Data(&mut procs[i].RAM_hist, (prc.statm().unwrap().size / 256) as u32, config); // size in mb 
+        let statm =  match prc.statm() {
+            Ok(statm) => { Log_Data(&mut procs[i].RAM_hist, (statm.size / 256) as u32, config); // size in mb 
+            },
+            Err(e) => {},
+        };
         Log_Data(&mut procs[i].CPU_hist, (100.0 * ((stat.utime+stat.stime) - prev_duration) as f32 / (cpu_total - sys_stats._cpu_total) as f32 / cpu_count as f32), config); // cpu percent time utilization
         //Log_Data(&mut procs[i].CPU_hist, (((stat.utime+stat.stime)as i128 - prev_duration) as f32 /config.update_freq *100.0) as u8, config); // cpu percent time utilization
-        Log_Data(&mut procs[i].DISK_hist, (prc.io().unwrap().write_bytes/(1024*1024)) as u32, config); // cpu percent time utilization
+        let prcio = match prc.io() {
+            Ok(prcio) => {Log_Data(&mut procs[i].DISK_hist, (prcio.write_bytes/(1024*1024)) as u32, config); // cpu percent time utilization
+            },
+            Err(e) => {},
+        };
         Log_Data(&mut procs[i].SWAP_hist, (stat.nswap /256) as u16, config); //swap in mb
         
         
         let mut netsum:u32 = 0;
-        for (_key, net_devstat) in prc.dev_status().unwrap().iter() {
-            netsum += (net_devstat.recv_bytes + net_devstat.sent_bytes) as u32;
-            total_net += net_devstat.recv_bytes + net_devstat.sent_bytes;
-        }
+        let devstatus = match prc.dev_status() {
+            Err(e) => {},
+            Ok(devstatus) => {
+                for (_key, net_devstat) in devstatus.iter() {
+                    netsum += (net_devstat.recv_bytes + net_devstat.sent_bytes) as u32;
+                    total_net += net_devstat.recv_bytes + net_devstat.sent_bytes;
+                }
+            }
+        };
+    
+        
         Log_Data(&mut procs[i].NET_hist, netsum, config); //network usage in kb
 
-        let _diskstats = procfs::diskstats().unwrap();
         procs[i]._prev_duration = (stat.utime+stat.stime);
     }
     // check for any missed children procs assignment

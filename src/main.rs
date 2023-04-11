@@ -257,10 +257,9 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
             },
             Err(_e) => {},
         };
-        //log_data(&mut procs[i].cpu_hist, 100.0 * ((stat.utime+stat.stime) - prev_duration) as f32 / (cpu_total - sys_stats._cpu_total) as f32 / cpu_count as f32, config); // cpu percent time utilization
+        log_data(&mut procs[i].cpu_hist, 10.0 * ((stat.utime+stat.stime) - prev_duration) as f32 / (cpu_total - sys_stats._cpu_total) as f32 / cpu_count as f32, config); // cpu percent time utilization
 
-        let ts = procs[i].start_time.timestamp().clone() as f64;
-        log_data(&mut procs[i].cpu_hist, ((stat.utime+stat.stime) as f32 * 100.0) / (procfs::Uptime::new().unwrap().uptime as f64 / ticks_per_second() as f64 - ts) as f32, config); // cpu percent time utilization
+        // log_data(&mut procs[i].cpu_hist, ((stat.utime+stat.stime) as f32 * 100.0) / (procfs::Uptime::new().unwrap().uptime as f64 - stat.starttime as f64) as f32, config); // cpu percent time utilization
         
         let _prcio = match prc.io() {
             Ok(prcio) => {log_data(&mut procs[i].disk_hist, (prcio.write_bytes/(1024*1024)) as u32, config); // cpu percent time utilization

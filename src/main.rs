@@ -33,6 +33,7 @@ struct Process {
     state: PState,
     open_fds: u16,
     run_duration: u32,
+    start_time: String,
     dir: PathBuf, // program location as a pathbuf  
                   //do .into_os_string().into_string().unwrap() to convert to string
     _prev_duration: u64,
@@ -221,7 +222,7 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
         }
         
         if (cmd.is_empty()) {
-            procs[i].name = stat.comm;
+            procs[i].name = stat.comm.clone();;
         }
         else {
             procs[i].name = cmd;
@@ -229,7 +230,8 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
         procs[i].pid = stat.pid as u32;
         procs[i].parent_pid = stat.ppid as u32;
         procs[i].priority = stat.priority as u8;
-        procs[i].run_duration = ((stat.utime + stat.stime + stat.cutime as u64 + stat.cstime as u64 + stat.guest_time.unwrap_or_default()) / tps) as u32;  
+        //procs[i].run_duration = ((stat.utime + stat.stime + stat.cutime as u64 + stat.cstime as u64 + stat.guest_time.unwrap_or_default()) / tps) as u32;  
+        procs[i].start_time = stat.starttime().unwrap().to_rfc2822();
         procs[i].dir = prc.exe().unwrap_or_default();
         procs[i].owner = get_user_by_uid(prc.uid().unwrap()).unwrap().name().to_str().unwrap().to_string();
         procs[i].group = get_group_by_gid(stat.pgrp as u32).unwrap_or(Group::new(0, "none")).name().to_str().unwrap().to_string();

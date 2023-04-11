@@ -1,5 +1,5 @@
 [package]
-name = "LPM"
+name = "lpm"
 version = "0.1.0"
 edition = "2021"
 
@@ -10,5 +10,6 @@ procfs = "0.15.1"
 users = "0.11"
 queues = "1.0.2"
 fs = "0.0.5"
-cursive = "0.20"
+cursive = { version = "0.20", features = ["toml"] }
+# cursive = "0.20"
 cursive_table_view = "0.14"

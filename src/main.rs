@@ -4,13 +4,15 @@ use std::vec::Vec;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::fs::read_to_string;
-use std::{thread, time};
+use std::num::NonZeroU32;
 
 use users::{get_user_by_uid, get_group_by_gid, Group}; // library for linux users
 use procfs::{process::{ProcState}}; // proc reading library
 
+// cursive TUI imports
 use cursive::Cursive;
-use cursive::views::{Dialog, TextView};
+use cursive::theme::{Color, PaletteColor, Theme, BorderStyle};
+use cursive::views::{Dialog, TextView, LinearLayout};
 use cursive_table_view::{TableView, TableViewItem };
 use cursive::CursiveExt;
 use cursive::align::HAlign;
@@ -18,45 +20,36 @@ use cursive::traits::*;
 use std::cmp::Ordering;
 extern crate cursive_table_view;
 
-
-// trait ProccessFn { // process functions here
-//     fn getCPU(&self);
-//     fn getRAM(&self);
-//     fn getDISK(&self);
-//     fn getNET(&self);
-//     fn getSWAP(&self);
-// }
-
-
-#[derive(Default, Clone, Debug)]
+// structure for holding a single process data
+#[derive(Default, Clone, Debug, PartialEq)]
 struct Process {
-    PID: u32,
-    parent_PID: u32,
+    pid: u32,
+    parent_pid: u32,
     children: Vec<u32>,
     name: String,
     owner: String,
     group: String,
     priority: u8,
-    state: p_state,
+    state: PState,
     open_fds: u16,
     run_duration: u32,
     dir: PathBuf, // program location as a pathbuf  
-
                   //do .into_os_string().into_string().unwrap() to convert to string
-    
     _prev_duration: u64,
     //Data Record
-    CPU_hist:  LinkedList<f32>,
-    RAM_hist:  LinkedList<u32>,  //   units is megabytes
-    DISK_hist: LinkedList<u32>,  //   units is megabytes
-    NET_hist:  LinkedList<u32>,  //   units is megabytes
-    SWAP_hist: LinkedList<u16>, //   units is megabytes
+    cpu_hist:  LinkedList<f32>,
+    ram_hist:  LinkedList<u32>,  //   units is megabytes
+    disk_hist: LinkedList<u32>,  //   units is megabytes
+    net_hist:  LinkedList<u32>,  //   units is megabytes
+    swap_hist: LinkedList<u16>, //   units is megabytes
 }
-#[derive(Clone, Debug)]
-struct p_state{
+
+// setting the default state of the process to running
+#[derive(Clone, Debug, PartialEq)]
+struct PState{
     procstate: ProcState
 }
-impl Default for p_state {
+impl Default for PState {
     fn default() -> Self {
         Self {
             procstate: ProcState::Running
@@ -64,27 +57,29 @@ impl Default for p_state {
     }
 }
 
+// structure for holding system wide data
 #[derive(Default)]
 struct SysStats {
-    CPU_Name: String,
-    CPU_Freq: u16,
-    CPU_Temp: i8,
-    CPU_coresnum: u8,
+    cpu_name: String,
+    cpu_freq: u16,
+    cpu_temp: i8,
+    cpu_cores_num: u8,
     uptime: f64, // in seconds
     mem_total: u32, // in megabytes
     
     user_proc_count: u32,
 
     // Records
-    CPU_hist: LinkedList<Vec<f32>>, // vector of usage per cpu core
-    RAM_hist:  LinkedList<u32>,
-    DISK_hist:  LinkedList<u32>, // change type according to units
-    NET_hist:  LinkedList<u32>, // change type according to units
-    SWAP_hist:  LinkedList<u16>,
+    cpu_hist: LinkedList<Vec<f32>>, // vector of usage per cpu core
+    ram_hist:  LinkedList<u32>,
+    disk_hist:  LinkedList<u32>, // change type according to units
+    net_hist:  LinkedList<u32>, // change type according to units
+    swap_hist:  LinkedList<u16>,
 
     _cpu_total: u64,
 }
 
+// structure for holding the user's configuration data
 #[derive(Copy, Clone)]
 struct Config {
     record_length : u32,
@@ -100,21 +95,80 @@ impl Config {
     }
 }
 
-// impl ProccessFn for Process {
-//     // define Process functions here
+// TUI table columns enum along with their string representation
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
+enum BasicColumn {
+    PID,
+    PPID,
+    CMD,
+    CPU,
+    OWNER,
+    DIR,
+    PRIORITY,
+    STATE,
+    RUNTIME
+}
 
-// }
+impl BasicColumn {
+    fn as_str(&self) -> &str {
+        match *self {
+            BasicColumn::PID => "PID",
+            BasicColumn::PPID => "PPID",
+            BasicColumn::CMD => "CMD",
+            BasicColumn::CPU => "CPU",
+            BasicColumn::OWNER => "OWNER",
+            BasicColumn::DIR => "DIR",
+            BasicColumn::PRIORITY => "PRIORITY",
+            BasicColumn::STATE => "STATE",
+            BasicColumn::RUNTIME => "RUNTIME",
+        }
+    }
+}
 
-// main structures
+// TUI table column functions to display and compare data
+impl TableViewItem<BasicColumn> for Process {
 
-fn Log_Data<T>(list: &mut LinkedList<T>, val:T, config: Config) { // all stat data entry should be through this function 
+    fn to_column(&self, column: BasicColumn) -> String {
+        match column {
+            BasicColumn::PID => format!("{}", self.pid),
+            BasicColumn::PPID => format!("{}", self.parent_pid),
+            BasicColumn::CMD => self.name.to_string(),
+            BasicColumn::CPU => format!("{:.4}", self.cpu_hist.front().unwrap() * 100 as f32),
+            BasicColumn::OWNER => self.owner.to_string(),
+            BasicColumn::DIR => self.dir.display().to_string(),
+            BasicColumn::PRIORITY => format!("{}", self.priority),
+            BasicColumn::STATE => format!("{:?}", self.state.procstate),
+            BasicColumn::RUNTIME => format!("{}", self.run_duration),
+        }
+    }
+
+    fn cmp(&self, other: &Self, column: BasicColumn) -> Ordering where Self: Sized {
+        match column {
+            BasicColumn::PID => self.pid.cmp(&other.pid),
+            BasicColumn::PPID => self.parent_pid.cmp(&other.parent_pid),
+            BasicColumn::CMD => self.name.cmp(&other.name),
+            BasicColumn::CPU => self.cpu_hist.back().unwrap().partial_cmp(&other.cpu_hist.back().unwrap()).unwrap_or(Ordering::Equal),
+            BasicColumn::OWNER => self.owner.cmp(&other.owner),
+            BasicColumn::DIR => self.dir.cmp(&other.dir),
+            BasicColumn::PRIORITY => self.priority.cmp(&other.priority),
+            BasicColumn::STATE => format!("{:?}", self.state.procstate).cmp(&format!("{:?}", &other.state.procstate)),
+            BasicColumn::RUNTIME => self.run_duration.cmp(&other.run_duration),
+        }
+    }
+
+}
+
+
+// function to add data to the linked list
+fn log_data<T>(list: &mut LinkedList<T>, val:T, config: Config) { // all stat data entry should be through this function 
     if list.len() == config.record_length as usize {
         list.cursor_back_mut().remove_current();
     }
     list.push_front(val);
 }
 
-fn Update_Procs(pidTable: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys_stats: &mut SysStats, config: Config) {
+// function to read system wide processes along with system wide data and update the data structures
+fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys_stats: &mut SysStats, config: Config) {
     let tps = procfs::ticks_per_second();
     let mut child_queue: Vec<(u32, u32)> = Vec::new(); // ppid, pid
     let mut total_net = 0;
@@ -126,8 +180,8 @@ fn Update_Procs(pidTable: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys_
 
     for cpu in procfs::KernelStats::new().unwrap().cpu_time {
     	let mut prev:f32 = 0.0;
-    	if sys_stats.CPU_hist.len() > 0 {
-            prev = sys_stats.CPU_hist.front().unwrap()[cpu_count as usize]
+    	if sys_stats.cpu_hist.len() > 0 {
+            prev = sys_stats.cpu_hist.front().unwrap()[cpu_count as usize]
         }
         cpus_usage.push( (cpu.idle as f32 - prev/100.0 * config.update_freq) /config.update_freq*100.0 );
         cpu_count += 1;
@@ -141,18 +195,18 @@ fn Update_Procs(pidTable: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys_
         
         proc_count += 1;
         let i: usize;
-        if pidTable.contains_key(&(stat.pid as u32)) {
-            i = pidTable[&(stat.pid as u32)] as usize; // index of desired process
+        if pid_table.contains_key(&(stat.pid as u32)) {
+            i = pid_table[&(stat.pid as u32)] as usize; // index of desired process
             if procs[i].name != stat.comm { // proc has been replaced -> clear all history while updating
-                procs[i].CPU_hist.clear();
-                procs[i].RAM_hist.clear();
-                procs[i].DISK_hist.clear();
-                procs[i].NET_hist.clear();
+                procs[i].cpu_hist.clear();
+                procs[i].ram_hist.clear();
+                procs[i].disk_hist.clear();
+                procs[i].net_hist.clear();
             }
         }
         else {
             i = procs.len();
-            pidTable.insert(stat.pid as u32, i as u16);
+            pid_table.insert(stat.pid as u32, i as u16);
             let newproc : Process = Process::default();
             procs.push(newproc);
         }
@@ -161,8 +215,8 @@ fn Update_Procs(pidTable: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys_
         // Read Proc data
         procs[i].state.procstate = stat.state().unwrap();
         procs[i].name = stat.comm;
-        procs[i].PID = stat.pid as u32;
-        procs[i].parent_PID = stat.ppid as u32;
+        procs[i].pid = stat.pid as u32;
+        procs[i].parent_pid = stat.ppid as u32;
         procs[i].priority = stat.priority as u8;
         procs[i].run_duration = (stat.utime + stat.stime + stat.cutime as u64 + stat.cstime as u64 + stat.guest_time.unwrap_or_default() / tps) as u32;  
         procs[i].dir = prc.exe().unwrap_or_default();
@@ -175,8 +229,8 @@ fn Update_Procs(pidTable: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys_
         };
 
         if stat.ppid > 0 { // parent-child relating
-            if pidTable.contains_key(&(stat.ppid as u32)) {
-                procs[pidTable[&(stat.ppid as u32)] as usize].children.push(stat.pid as u32);
+            if pid_table.contains_key(&(stat.ppid as u32)) {
+                procs[pid_table[&(stat.ppid as u32)] as usize].children.push(stat.pid as u32);
             }
             else {
                 child_queue.push((stat.ppid as u32, stat.pid as u32));
@@ -185,17 +239,17 @@ fn Update_Procs(pidTable: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys_
         
         let prev_duration = procs[i]._prev_duration;
         let _statm =  match prc.statm() {
-            Ok(statm) => { Log_Data(&mut procs[i].RAM_hist, (statm.size / 256) as u32, config); // size in mb 
+            Ok(statm) => { log_data(&mut procs[i].ram_hist, (statm.size / 256) as u32, config); // size in mb 
             },
             Err(_e) => {},
         };
-        Log_Data(&mut procs[i].CPU_hist, 100.0 * ((stat.utime+stat.stime) - prev_duration) as f32 / (cpu_total - sys_stats._cpu_total) as f32 / cpu_count as f32, config); // cpu percent time utilization
+        log_data(&mut procs[i].cpu_hist, 100.0 * ((stat.utime+stat.stime) - prev_duration) as f32 / (cpu_total - sys_stats._cpu_total) as f32 / cpu_count as f32, config); // cpu percent time utilization
         let _prcio = match prc.io() {
-            Ok(prcio) => {Log_Data(&mut procs[i].DISK_hist, (prcio.write_bytes/(1024*1024)) as u32, config); // cpu percent time utilization
+            Ok(prcio) => {log_data(&mut procs[i].disk_hist, (prcio.write_bytes/(1024*1024)) as u32, config); // cpu percent time utilization
             },
             Err(_e) => {},
         };
-        Log_Data(&mut procs[i].SWAP_hist, (stat.nswap /256) as u16, config); //swap in mb
+        log_data(&mut procs[i].swap_hist, (stat.nswap /256) as u16, config); //swap in mb
         
         
         let mut netsum:u32 = 0;
@@ -210,29 +264,29 @@ fn Update_Procs(pidTable: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys_
         };
     
         
-        Log_Data(&mut procs[i].NET_hist, netsum, config); //network usage in kb
+        log_data(&mut procs[i].net_hist, netsum, config); //network usage in kb
 
         procs[i]._prev_duration = stat.utime+stat.stime;
     }
     // check for any missed children procs assignment
     for entry in child_queue {
-        procs[ pidTable[&entry.0] as usize].children.push(entry.1 as u32); // add missing children 
+        procs[ pid_table[&entry.0] as usize].children.push(entry.1 as u32); // add missing children 
     }
 
     // UPDATE SYSTEM DATA
     sys_stats.uptime = procfs::Uptime::new().unwrap().uptime;
     
     
-    Log_Data(&mut sys_stats.CPU_hist, cpus_usage, config);
-    Log_Data(&mut sys_stats.RAM_hist ,((procfs::Meminfo::new().unwrap().mem_total - procfs::Meminfo::new().unwrap().mem_free) / 1024) as u32, config);
+    log_data(&mut sys_stats.cpu_hist, cpus_usage, config);
+    log_data(&mut sys_stats.ram_hist ,((procfs::Meminfo::new().unwrap().mem_total - procfs::Meminfo::new().unwrap().mem_free) / 1024) as u32, config);
     let mut sum = 0;
     for d in procfs::diskstats().unwrap() {
         sum += d.sectors_written;
     }
-    Log_Data(&mut sys_stats.DISK_hist , (sum * 512/(1024*1024)) as u32, config);
-    Log_Data(&mut sys_stats.NET_hist , (total_net/1024) as u32, config); // in mb
-    Log_Data(&mut sys_stats.SWAP_hist ,((procfs::Meminfo::new().unwrap().swap_total - procfs::Meminfo::new().unwrap().swap_free) / 1024) as u16, config);
-    sys_stats.CPU_coresnum = cpu_count;
+    log_data(&mut sys_stats.disk_hist , (sum * 512/(1024*1024)) as u32, config);
+    log_data(&mut sys_stats.net_hist , (total_net/1024) as u32, config); // in mb
+    log_data(&mut sys_stats.swap_hist ,((procfs::Meminfo::new().unwrap().swap_total - procfs::Meminfo::new().unwrap().swap_free) / 1024) as u16, config);
+    sys_stats.cpu_cores_num = cpu_count;
     sys_stats.user_proc_count = proc_count;
 
     let freq = read_to_string("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq").unwrap_or_default();
@@ -240,126 +294,81 @@ fn Update_Procs(pidTable: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys_
 
     let freq = freq.trim().parse::<f64>().unwrap_or_default() / 1000.0;
     let temp = temp.trim().parse::<f64>().unwrap_or_default() / 1000.0;
-    sys_stats.CPU_Freq = freq as u16;
-    sys_stats.CPU_Temp = temp as i8;
+    sys_stats.cpu_freq = freq as u16;
+    sys_stats.cpu_temp = temp as i8;
 
     let cpuinfo = read_to_string("/proc/cpuinfo").unwrap_or_default();
     let model_name = cpuinfo.lines().find(|line| line.starts_with("model name")).unwrap_or_default();
     let model_name = model_name.split(":").nth(1).unwrap_or_default().trim();
-    sys_stats.CPU_Name = (*model_name).to_string();
+    sys_stats.cpu_name = (*model_name).to_string();
     sys_stats._cpu_total = cpu_total;
 }
 
-
-
-fn main() {
-    // main structures
-    let _processes : Vec<Process> = Vec::new(); 
-    let _getProc : HashMap<i32, u16> = HashMap::new();
-    let _sys_stats : SysStats = SysStats::default();
-    let _config : Config = Config::start();
-
-    // arrays of indices sorted per each stat
-    let _mem_sort : Vec<u32> = Vec::new(); // contains the indices of processes relative to the processes vector, sorted in their respective order
-    let _cpu_sort : Vec<u32> = Vec::new(); // processes[ memsort[0] ]  = max memory usage
-    let _disk_sort : Vec<u32> = Vec::new();
-    let _net_sort : Vec<u32> = Vec::new();
-    let _priority_sort : Vec<u32> = Vec::new();    
-    // test_update_procs();
-    display_TUI();
-
-}
-
-#[derive(Copy, Clone, PartialEq, Eq, Hash)]
-enum BasicColumn {
-    PID,
-    PPID,
-    CMD,
-    CPU,
-    OWNER,
-    DIR,
-}
-
-impl BasicColumn {
-    fn as_str(&self) -> &str {
-        match *self {
-            BasicColumn::PID => "PID",
-            BasicColumn::PPID => "PPID",
-            BasicColumn::CMD => "CMD",
-            BasicColumn::CPU => "CPU",
-            BasicColumn::OWNER => "OWNER",
-            BasicColumn::DIR => "DIR",
-        }
-    }
-}
-
-impl TableViewItem<BasicColumn> for Process {
-
-    fn to_column(&self, column: BasicColumn) -> String {
-        match column {
-            BasicColumn::PID => format!("{}", self.PID),
-            BasicColumn::PPID => format!("{}", self.parent_PID),
-            BasicColumn::CMD => self.name.to_string(),
-            BasicColumn::CPU => format!("{}", self.CPU_hist.front().unwrap()),
-            BasicColumn::OWNER => self.owner.to_string(),
-            BasicColumn::DIR => self.dir.display().to_string(),
-        }
-    }
-
-    fn cmp(&self, other: &Self, column: BasicColumn) -> Ordering where Self: Sized {
-        match column {
-            BasicColumn::PID => self.PID.cmp(&other.PID),
-            BasicColumn::PPID => self.parent_PID.cmp(&other.parent_PID),
-            BasicColumn::CMD => self.name.cmp(&other.name),
-            BasicColumn::CPU => self.CPU_hist.back().unwrap().partial_cmp(&other.CPU_hist.back().unwrap()).unwrap_or(Ordering::Equal),
-            BasicColumn::OWNER => self.owner.cmp(&other.owner),
-            BasicColumn::DIR => self.dir.cmp(&other.dir),
-        }
-    }
-
-}
-
-fn display_TUI()
+// function to display the TUI
+fn display_tui()
 {
-    let mut pidTable: HashMap<u32, u16> = HashMap::new();
+    let mut counter: u32 = 0;
+
+    let mut pid_table: HashMap<u32, u16> = HashMap::new();
     let mut procs: Vec<Process> = Vec::new();
     let mut sys_stats: SysStats = SysStats {
-        CPU_Name: String::new(),
-        CPU_Freq: 0,
-        CPU_Temp: 0,
-        CPU_coresnum: 0,
+        cpu_name: String::new(),
+        cpu_freq: 0,
+        cpu_temp: 0,
+        cpu_cores_num: 0,
         uptime: 0.0,
         mem_total: 0,
         user_proc_count: 0,
-        CPU_hist: LinkedList::new(),
-        RAM_hist: LinkedList::new(),
-        DISK_hist: LinkedList::new(),
-        NET_hist: LinkedList::new(),
-        SWAP_hist: LinkedList::new(),
+        cpu_hist: LinkedList::new(),
+        ram_hist: LinkedList::new(),
+        disk_hist: LinkedList::new(),
+        net_hist: LinkedList::new(),
+        swap_hist: LinkedList::new(),
         _cpu_total:0,
     };
     let config = Config { record_length: 5, update_freq: 1.0 };
 
-    Update_Procs(&mut pidTable, &mut procs, &mut sys_stats, config);
+    update_procs(&mut pid_table, &mut procs, &mut sys_stats, config);
 
     let mut siv = Cursive::default();
+
+    let theme = custom_theme_from_cursive(&siv);
+    siv.set_theme(theme);
+
+    // We can quit by pressing `q`
+    siv.add_global_callback('q', Cursive::quit);
+    
+    // pause real time update by pressing space
+    siv.add_global_callback(' ', |s| {
+        if s.fps() == NonZeroU32::new(0) {
+            s.set_fps(1);
+            s.call_on_name("status", |view: &mut TextView| {
+                view.set_content("Status: Updating in realtime...");
+            });
+        } else {
+            s.set_fps(0);
+            s.call_on_name("status", |view: &mut TextView| {
+                view.set_content("Status: Paused");
+            });
+        }
+    });
+
     let mut table = TableView::<Process, BasicColumn>::new()
         .column(BasicColumn::PID, "PID", |c| {
-            c.ordering(Ordering::Greater)
+            c.ordering(Ordering::Less)
             .align(HAlign::Right)
+            .width_percent(5)
         })
-        .column(BasicColumn::PPID, "PPID", |c| c.align(HAlign::Right))
-        .column(BasicColumn::CMD, "CMD", |c| c.align(HAlign::Right))
-        .column(BasicColumn::CPU, "CPU", |c| c.align(HAlign::Right))
-        .column(BasicColumn::OWNER, "OWNER", |c| c.align(HAlign::Right))
-        .column(BasicColumn::DIR, "DIR", |c| c.align(HAlign::Right));
-
-    table.set_items(procs);
-
-    // // Add some rows to the table
-    // for prc in procs {
-    //     table.add_row(vec![prc.PID.to_string(), prc.parent_PID.to_string(), prc.name.to_string(), prc.CPU_hist.front().unwrap().to_string(), prc.owner, prc.dir.display().to_string()]);
-    // }
+        .column(BasicColumn::PPID, "PPID", |c| c.align(HAlign::Right).width_percent(5))
+        .column(BasicColumn::CMD, "CMD", |c| c.align(HAlign::Right).width_percent(25))
+        .column(BasicColumn::CPU, "CPU", |c| c.align(HAlign::Right).width_percent(5))
+        .column(BasicColumn::OWNER, "OWNER", |c| c.align(HAlign::Right).width_percent(7))
+        .column(BasicColumn::DIR, "DIR", |c| c.align(HAlign::Right).width_percent(25))
+        .column(BasicColumn::PRIORITY, "PRIORITY", |c| c.align(HAlign::Right).width_percent(5))
+        .column(BasicColumn::STATE, "STATE", |c| c.align(HAlign::Right).width_percent(5))
+        .column(BasicColumn::RUNTIME, "RUNTIME", |c| c.align(HAlign::Right).width_percent(10));
+    
+    table.set_items(procs.clone());
 
     // Detect clicks on column headers
     table.set_on_sort(|siv: &mut Cursive, column: BasicColumn, order: Ordering| {
@@ -372,59 +381,115 @@ fn display_TUI()
         );
     });
 
-    // siv.add_layer(table.with_name("table"));
-    siv.add_layer(Dialog::around(table.with_name("table").full_screen()).title("Table View"));
+
+    siv.add_layer(
+        LinearLayout::vertical()
+            .child(
+                Dialog::around(LinearLayout::vertical()
+                    .child(LinearLayout::horizontal()
+                        .child(TextView::new(format!("CPU Name: {}", sys_stats.cpu_name)).h_align(HAlign::Left).with_name("cpu_name").full_width())
+                        .child(TextView::new(format!("CPU Frequency: {}MHz", sys_stats.cpu_freq)).h_align(HAlign::Left).with_name("cpu_freq").full_width())
+                    )
+                    .child(LinearLayout::horizontal()
+                        .child(TextView::new(format!("CPU Temperature: {} °C", sys_stats.cpu_temp)).h_align(HAlign::Left).with_name("cpu_temp").full_width())
+                        .child(TextView::new(format!("Number of cores: {}", sys_stats.cpu_cores_num)).h_align(HAlign::Left).with_name("cpu_cores_num").full_width())
+                    )
+                    .child(LinearLayout::horizontal()
+                        .child(TextView::new(format!("System Uptime: {}s", sys_stats.uptime)).h_align(HAlign::Left).with_name("uptime").full_width())
+                        .child(TextView::new(format!("Total Memory: {}MB", sys_stats.mem_total)).h_align(HAlign::Left).with_name("mem_total").full_width())
+                    )
+                    .child(LinearLayout::horizontal()
+                        .child(TextView::new(format!("Swap Usage: {}%", sys_stats.swap_hist.front().unwrap())).h_align(HAlign::Left).with_name("swap_usage").full_width())
+                        .child(TextView::new(format!("Number of processes: {}", sys_stats.user_proc_count)).h_align(HAlign::Left).with_name("user_proc_count").full_width())
+                    )
+                )
+                .title("System Information")
+            )
+            .child(Dialog::around(table.with_name("table").full_screen()).title("Processes"))
+            .child(Dialog::around(LinearLayout::horizontal()
+                .child(TextView::new("Press <q> to exit. Press <space> to pause/unpase real time update"))
+                .child(TextView::new("Status: Updating in realtime...").h_align(HAlign::Right).with_name("status").full_width()
+            )).title("Controls"))
+    );
+
+
+    siv.add_global_callback(cursive::event::Event::Refresh, move |s| {
+        update_views(s, &mut procs, &mut pid_table, &mut sys_stats, config, counter);
+        counter += 1;
+    });
+    siv.set_autorefresh(true);
+    siv.set_fps(1);
+
 
     siv.run();
-
 }
 
-
-fn test_update_procs() {
-    let mut pidTable: HashMap<u32, u16> = HashMap::new();
-    let mut procs: Vec<Process> = Vec::new();
-    let mut sys_stats: SysStats = SysStats {
-        CPU_Name: String::new(),
-        CPU_Freq: 0,
-        CPU_Temp: 0,
-        CPU_coresnum: 0,
-        uptime: 0.0,
-        mem_total: 0,
-        user_proc_count: 0,
-        CPU_hist: LinkedList::new(),
-        RAM_hist: LinkedList::new(),
-        DISK_hist: LinkedList::new(),
-        NET_hist: LinkedList::new(),
-        SWAP_hist: LinkedList::new(),
-        _cpu_total:0,
-    };
-    let config = Config { record_length: 5, update_freq: 1.0 };
-    Update_Procs(&mut pidTable, &mut procs, &mut sys_stats, config);
-    thread::sleep(time::Duration::from_secs(1));
-    Update_Procs(&mut pidTable, &mut procs, &mut sys_stats, config);
-    
-    println!("{: >8} {: >8} {: >8} {: >8} {: >8} {: >8}", "PID", "PPID", "CMD", "CPU", "OWNER", "DIR");
-    
-    for prc in procs {
-        println!("{: <8} {: <8} {: <8} {:.1} {: <8} {: <8}", prc.PID, prc.parent_PID, prc.name, prc.CPU_hist.front().unwrap(), prc.owner, prc.dir.display());
+// function to update the table view in the TUI
+fn update_views(siv: &mut Cursive, procs: &mut Vec<Process>, pid_table: &mut HashMap<u32, u16>, sys_stats: &mut SysStats, config: Config, counter: u32) {
+    if counter % 1 == 0
+    {
+        update_procs(pid_table, procs, sys_stats, config);
+        siv.call_on_name("cpu_name", |view: &mut TextView| {
+            view.set_content(format!("CPU Name: {}", sys_stats.cpu_name));
+        });
+        siv.call_on_name("cpu_freq", |view: &mut TextView| {
+            view.set_content(format!("CPU Frequency: {}MHz", sys_stats.cpu_freq));
+        });
+        siv.call_on_name("cpu_temp", |view: &mut TextView| {
+            view.set_content(format!("CPU Temperature: {} °C", sys_stats.cpu_temp));
+        });
+        siv.call_on_name("cpu_cores_num", |view: &mut TextView| {
+            view.set_content(format!("Number of cores: {}", sys_stats.cpu_cores_num));
+        });
+        siv.call_on_name("uptime", |view: &mut TextView| {
+            view.set_content(format!("System Uptime: {}s", sys_stats.uptime));
+        });
+        siv.call_on_name("mem_total", |view: &mut TextView| {
+            view.set_content(format!("Total Memory: {}MB", sys_stats.mem_total));
+        });
+        siv.call_on_name("swap_usage", |view: &mut TextView| {
+            view.set_content(format!("Swap Usage: {}%", sys_stats.swap_hist.front().unwrap()));
+        });
+        siv.call_on_name("user_proc_count", |view: &mut TextView| {
+            view.set_content(format!("Number of processes: {}", sys_stats.user_proc_count));
+        });
+        siv.call_on_name("table", |view: &mut TableView<Process, BasicColumn>| {
+            view.set_items_stable(procs.clone());
+        });
     }
-    
 }
 
-#[test]
-fn test_log_data() {
-    let mut list: LinkedList<u32> = LinkedList::new();
-    let config = Config { record_length: 5, update_freq: 1.0 };
-    Log_Data(&mut list, 10, config);
-    assert_eq!(list.len(), 1);
-    assert_eq!(list.front().unwrap(), &10);
-    Log_Data(&mut list, 20, config);
-    assert_eq!(list.len(), 2);
-    assert_eq!(list.front().unwrap(), &20);
-    Log_Data(&mut list, 30, config);
-    Log_Data(&mut list, 40, config);
-    Log_Data(&mut list, 50, config);
-    Log_Data(&mut list, 60, config);
-    assert_eq!(list.len(), 5);
-    assert_eq!(list.front().unwrap(), &60);
+// function to return a theme with the colors we want for the TUI
+fn custom_theme_from_cursive(siv: &Cursive) -> Theme {
+    let mut theme = siv.current_theme().clone();
+
+    theme.palette[PaletteColor::Background] = Color::TerminalDefault;
+    theme.palette[PaletteColor::View] = Color::TerminalDefault;
+    theme.palette[PaletteColor::Primary] = Color::Rgb(255, 255, 255);
+    theme.palette[PaletteColor::HighlightText] = Color::Rgb(0, 0, 0);
+    theme.palette[PaletteColor::Highlight] = Color::Rgb(0, 230, 118);
+    theme.palette[PaletteColor::HighlightInactive] = Color::Rgb(77, 182, 172);
+    theme.shadow = false;
+    theme.borders = BorderStyle::Simple;
+
+    theme
+}
+
+// main function
+fn main() {
+    // main structures
+    let _processes : Vec<Process> = Vec::new(); 
+    let _get_proc : HashMap<i32, u16> = HashMap::new();
+    let _sys_stats : SysStats = SysStats::default();
+    let _config : Config = Config::start();
+
+    // arrays of indices sorted per each stat
+    let _mem_sort : Vec<u32> = Vec::new(); // contains the indices of processes relative to the processes vector, sorted in their respective order
+    let _cpu_sort : Vec<u32> = Vec::new(); // processes[ memsort[0] ]  = max memory usage
+    let _disk_sort : Vec<u32> = Vec::new();
+    let _net_sort : Vec<u32> = Vec::new();
+    let _priority_sort : Vec<u32> = Vec::new();    
+
+    // test_update_procs();
+    display_tui();
 }

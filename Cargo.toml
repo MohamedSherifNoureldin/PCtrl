@@ -13,3 +13,4 @@ fs = "0.0.5"
 cursive = { version = "0.20", features = ["toml"] }
 # cursive = "0.20"
 cursive_table_view = "0.14"
+chrono = "0.4.24"

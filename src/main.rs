@@ -5,9 +5,10 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::fs::read_to_string;
 use std::num::NonZeroU32;
+use chrono::{DateTime, Local};
 
 use users::{get_user_by_uid, get_group_by_gid, Group}; // library for linux users
-use procfs::{process::{ProcState}}; // proc reading library
+use procfs::{process::{ProcState}, ticks_per_second}; // proc reading library
 
 // cursive TUI imports
 use cursive::Cursive;
@@ -33,7 +34,7 @@ struct Process {
     state: PState,
     open_fds: u16,
     run_duration: u32,
-    start_time: String,
+    start_time: DateTime<Local>, // to string via .to_rfc2822()
     dir: PathBuf, // program location as a pathbuf  
                   //do .into_os_string().into_string().unwrap() to convert to string
     _prev_duration: u64,
@@ -231,7 +232,7 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
         procs[i].parent_pid = stat.ppid as u32;
         procs[i].priority = stat.priority as u8;
         //procs[i].run_duration = ((stat.utime + stat.stime + stat.cutime as u64 + stat.cstime as u64 + stat.guest_time.unwrap_or_default()) / tps) as u32;  
-        procs[i].start_time = stat.starttime().unwrap().to_rfc2822();
+        procs[i].start_time = stat.starttime().unwrap();
         procs[i].dir = prc.exe().unwrap_or_default();
         procs[i].owner = get_user_by_uid(prc.uid().unwrap()).unwrap().name().to_str().unwrap().to_string();
         procs[i].group = get_group_by_gid(stat.pgrp as u32).unwrap_or(Group::new(0, "none")).name().to_str().unwrap().to_string();
@@ -256,7 +257,11 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
             },
             Err(_e) => {},
         };
-        log_data(&mut procs[i].cpu_hist, 100.0 * ((stat.utime+stat.stime) - prev_duration) as f32 / (cpu_total - sys_stats._cpu_total) as f32 / cpu_count as f32, config); // cpu percent time utilization
+        //log_data(&mut procs[i].cpu_hist, 100.0 * ((stat.utime+stat.stime) - prev_duration) as f32 / (cpu_total - sys_stats._cpu_total) as f32 / cpu_count as f32, config); // cpu percent time utilization
+
+        let ts = procs[i].start_time.timestamp().clone() as f64;
+        log_data(&mut procs[i].cpu_hist, ((stat.utime+stat.stime) as f32 * 100.0) / (procfs::Uptime::new().unwrap().uptime as f64 / ticks_per_second() as f64 - ts) as f32, config); // cpu percent time utilization
+        
         let _prcio = match prc.io() {
             Ok(prcio) => {log_data(&mut procs[i].disk_hist, (prcio.write_bytes/(1024*1024)) as u32, config); // cpu percent time utilization
             },

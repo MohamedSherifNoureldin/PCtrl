@@ -191,7 +191,7 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
     for prc in procfs::process::all_processes().unwrap() {
         let prc = prc.unwrap();
         let stat = prc.stat().unwrap();
-        //if (!prc.is_alive()) {continue};  //For only reading alive proces, ie not dead or zombie
+        if (!prc.is_alive()) {continue};  //For only reading alive proces, ie not dead or zombie
         
         proc_count += 1;
         let i: usize;
@@ -214,11 +214,22 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
         
         // Read Proc data
         procs[i].state.procstate = stat.state().unwrap();
-        procs[i].name = stat.comm;
+        //procs[i].name = stat.comm;
+        let mut cmd: String = String::new();
+        for entry in prc.cmdline().unwrap() {
+            cmd.push_str(&format!("{} ", entry));
+        }
+        
+        if (cmd.is_empty()) {
+            procs[i].name = stat.comm;
+        }
+        else {
+            procs[i].name = cmd;
+        }
         procs[i].pid = stat.pid as u32;
         procs[i].parent_pid = stat.ppid as u32;
         procs[i].priority = stat.priority as u8;
-        procs[i].run_duration = (stat.utime + stat.stime + stat.cutime as u64 + stat.cstime as u64 + stat.guest_time.unwrap_or_default() / tps) as u32;  
+        procs[i].run_duration = ((stat.utime + stat.stime + stat.cutime as u64 + stat.cstime as u64 + stat.guest_time.unwrap_or_default()) / tps) as u32;  
         procs[i].dir = prc.exe().unwrap_or_default();
         procs[i].owner = get_user_by_uid(prc.uid().unwrap()).unwrap().name().to_str().unwrap().to_string();
         procs[i].group = get_group_by_gid(stat.pgrp as u32).unwrap_or(Group::new(0, "none")).name().to_str().unwrap().to_string();
@@ -276,9 +287,9 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
     // UPDATE SYSTEM DATA
     sys_stats.uptime = procfs::Uptime::new().unwrap().uptime;
     
-    
+    sys_stats.mem_total = procfs::Meminfo::new().unwrap().mem_total as u32 / (1024*1024) as u32;
     log_data(&mut sys_stats.cpu_hist, cpus_usage, config);
-    log_data(&mut sys_stats.ram_hist ,((procfs::Meminfo::new().unwrap().mem_total - procfs::Meminfo::new().unwrap().mem_free) / 1024) as u32, config);
+    log_data(&mut sys_stats.ram_hist ,((procfs::Meminfo::new().unwrap().mem_total as u64 - procfs::Meminfo::new().unwrap().mem_free) / 1024) as u32, config);
     let mut sum = 0;
     for d in procfs::diskstats().unwrap() {
         sum += d.sectors_written;
@@ -288,6 +299,7 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
     log_data(&mut sys_stats.swap_hist ,((procfs::Meminfo::new().unwrap().swap_total - procfs::Meminfo::new().unwrap().swap_free) / 1024) as u16, config);
     sys_stats.cpu_cores_num = cpu_count;
     sys_stats.user_proc_count = proc_count;
+    
 
     let freq = read_to_string("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq").unwrap_or_default();
     let temp = read_to_string("/sys/class/thermal/thermal_zone0/temp").unwrap_or_default();
@@ -391,7 +403,7 @@ fn display_tui()
                         .child(TextView::new(format!("CPU Frequency: {}MHz", sys_stats.cpu_freq)).h_align(HAlign::Left).with_name("cpu_freq").full_width())
                     )
                     .child(LinearLayout::horizontal()
-                        .child(TextView::new(format!("CPU Temperature: {} °C", sys_stats.cpu_temp)).h_align(HAlign::Left).with_name("cpu_temp").full_width())
+                        .child(TextView::new(format!("CPU Temperature: {} \u{00b0C}", sys_stats.cpu_temp)).h_align(HAlign::Left).with_name("cpu_temp").full_width())
                         .child(TextView::new(format!("Number of cores: {}", sys_stats.cpu_cores_num)).h_align(HAlign::Left).with_name("cpu_cores_num").full_width())
                     )
                     .child(LinearLayout::horizontal()
@@ -436,7 +448,7 @@ fn update_views(siv: &mut Cursive, procs: &mut Vec<Process>, pid_table: &mut Has
             view.set_content(format!("CPU Frequency: {}MHz", sys_stats.cpu_freq));
         });
         siv.call_on_name("cpu_temp", |view: &mut TextView| {
-            view.set_content(format!("CPU Temperature: {} °C", sys_stats.cpu_temp));
+            view.set_content(format!("CPU Temperature: {} \u{00b0C}", sys_stats.cpu_temp));
         });
         siv.call_on_name("cpu_cores_num", |view: &mut TextView| {
             view.set_content(format!("Number of cores: {}", sys_stats.cpu_cores_num));

@@ -3,7 +3,9 @@ use std::collections::LinkedList;
 use std::vec::Vec;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::fs::read_to_string;
+use std::fs::{read_to_string, File};
+use std::io::Write;
+
 use std::num::NonZeroU32;
 use chrono::{DateTime, Local};
 
@@ -36,6 +38,7 @@ struct Process {
     run_duration: u32,
     start_time: DateTime<Local>, // to string via .to_rfc2822()
     dir: PathBuf, // program location as a pathbuf  
+    _mem_total: u32,
                   //do .into_os_string().into_string().unwrap() to convert to string
     _prev_duration: u64,
     //Data Record
@@ -79,6 +82,7 @@ struct SysStats {
     swap_hist:  LinkedList<u16>,
 
     _cpu_total: u64,
+    _idle: u64,
 }
 
 // structure for holding the user's configuration data
@@ -171,7 +175,7 @@ fn log_data<T>(list: &mut LinkedList<T>, val:T, config: Config) { // all stat da
 
 // function to read system wide processes along with system wide data and update the data structures
 fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys_stats: &mut SysStats, config: Config) {
-    let tps = procfs::ticks_per_second();
+    //let tps = procfs::ticks_per_second();
     let mut child_queue: Vec<(u32, u32)> = Vec::new(); // ppid, pid
     let mut total_net = 0;
     let mut proc_count = 0;
@@ -182,13 +186,17 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
     let uptime = procfs::Uptime::new().unwrap().uptime;
 
     for cpu in procfs::KernelStats::new().unwrap().cpu_time {
-    	let mut prev:f32 = 0.0;
+    	//let mut prev:f32 = 0.0;
     	if sys_stats.cpu_hist.len() > 0 {
-            prev = sys_stats.cpu_hist.front().unwrap()[cpu_count as usize]
+            //prev = sys_stats.cpu_hist.front().unwrap()[cpu_count as usize]
         }
-        cpu_total += cpu.user + cpu.nice + cpu.system + cpu.idle + cpu.iowait.unwrap_or(0) + cpu.irq.unwrap_or(0) + cpu.softirq.unwrap_or(0) + cpu.steal.unwrap_or(0);// + cpu.guest.unwrap_or(0) + cpu.guest_nice.unwrap_or(0);
+        cpu_total = cpu.user + cpu.nice + cpu.system + cpu.idle + cpu.iowait.unwrap_or(0) + cpu.irq.unwrap_or(0) + cpu.softirq.unwrap_or(0) + cpu.steal.unwrap_or(0);// + cpu.guest.unwrap_or(0) + cpu.guest_nice.unwrap_or(0);
         //100.0 * ((stat.utime+stat.stime) - prev_duration) as f32 / (cpu_total - sys_stats._cpu_total) as f32 * cpu_count as f32
-        cpus_usage.push( (cpu.idle as f32 - prev/100.0 * config.update_freq) /config.update_freq*100.0 );
+        let idle = cpu.idle + cpu.iowait.unwrap_or(0);
+        let totald = cpu_total as f64 - sys_stats._cpu_total as f64;
+        let idled = idle as f64 - sys_stats._idle as f64;
+        cpus_usage.push( (totald - idled) as f32/ totald as f32);
+        sys_stats._idle = idle;
         cpu_count += 1;
     }
 
@@ -230,6 +238,7 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
         else {
             procs[i].name = cmd;
         }
+        procs[i]._mem_total = sys_stats.mem_total;
         procs[i].pid = stat.pid as u32;
         procs[i].parent_pid = stat.ppid as u32;
         procs[i].priority = stat.priority as u8;
@@ -296,8 +305,11 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
     // UPDATE SYSTEM DATA
     sys_stats.uptime = uptime;
     
-    sys_stats.mem_total = procfs::Meminfo::new().unwrap().mem_total as u32 / (1024*1024) as u32;
+    sys_stats.mem_total = (10 * procfs::Meminfo::new().unwrap().mem_total as u64 / (1024*1024) as u64) as u32;
     log_data(&mut sys_stats.cpu_hist, cpus_usage, config);
+    // if sys_stats.disk_hist.len() > 2 {
+    //     println!("systemcpu: {}", 0.5 * (cpus_usage[0] + cpus_usage[1]) );
+    // }
     log_data(&mut sys_stats.ram_hist ,((procfs::Meminfo::new().unwrap().mem_total as u64 - procfs::Meminfo::new().unwrap().mem_free) / 1024) as u32, config);
     let mut sum = 0;
     for d in procfs::diskstats().unwrap() {
@@ -346,6 +358,7 @@ fn display_tui()
         net_hist: LinkedList::new(),
         swap_hist: LinkedList::new(),
         _cpu_total:0,
+        _idle:0,
     };
     let config = Config { record_length: 5, update_freq: 1.0 };
 
@@ -504,13 +517,53 @@ fn main() {
     let _sys_stats : SysStats = SysStats::default();
     let _config : Config = Config::start();
 
-    // arrays of indices sorted per each stat
-    let _mem_sort : Vec<u32> = Vec::new(); // contains the indices of processes relative to the processes vector, sorted in their respective order
-    let _cpu_sort : Vec<u32> = Vec::new(); // processes[ memsort[0] ]  = max memory usage
-    let _disk_sort : Vec<u32> = Vec::new();
-    let _net_sort : Vec<u32> = Vec::new();
-    let _priority_sort : Vec<u32> = Vec::new();    
+    let mut recording_procs: Vec<u32>; // pass this to record_prc function, any proc to be recorded should be added to this
 
     // test_update_procs();
     display_tui();
+}
+
+static mut PAUSE_REC:bool = false;
+ 
+
+fn record_prc(procs:Vec<Process>, pid_table: &mut HashMap<u32, u16>, pid: u32, recording_procs: Vec<u32>, config: Config) { // recordings exist in "/usr/local/pctrl/", process record format is plog
+    let file_name = format!("/usr/local/pctrl/pctrl_{}.plog", pid);
+    let mut file = File::create(format!("/usr/local/pctrl/pctrl_{}.plog", pid)).unwrap();
+    // match File::create(file_name) {
+    //     Ok(file) => {},//println!("{:?}", file),
+    //     Err(_) => println!("Unable to create the file: '{}'", file_name)
+    // }
+    if (pid_table[&pid] > procs.len() as u16) {
+        println!("Err in records proc: couldn't find pid!");
+        return
+    }
+    let prc = &procs[pid_table[&pid] as usize];
+    let mut which_file: bool = false;
+    let mut counter = 0;
+    //while recording_procs.iter().any(|e| pid.contains(e)) && unsafe{!PAUSE_REC} {
+    while recording_procs.contains(&pid) && unsafe{!PAUSE_REC} {
+        writeln!(&file, "{}", format!("{} {} {:?} {} {} {} {} {}", prc.name, prc.owner, 
+        prc.state.procstate, prc.cpu_hist.front().unwrap(), prc.ram_hist.front().unwrap(), 
+        prc.disk_hist.front().unwrap(), prc.net_hist.front().unwrap(), prc.swap_hist.front().unwrap())); // writing using the macro 'writeln!'
+        counter += 1;
+        if counter > config.record_length {
+            // remove from beginning of file
+            if which_file {
+                file = File::create(format!("/usr/local/pctrl/pctrl_{}.plog", pid)).unwrap(); 
+                which_file = false; 
+                //Ok(())
+            }
+            else {
+                file = File::create(format!("/usr/local/pctrl/pctrl_{}.plog1", pid)).unwrap();
+                which_file = true;
+                //Ok(())
+            }
+
+            counter = 0;
+        }
+    }
+}
+
+fn read_record(pid: u32) {
+
 }

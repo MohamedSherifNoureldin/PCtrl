@@ -179,15 +179,17 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
     let mut cpu_count: u8 = 0;
     let mut cpus_usage :Vec<f32> = Vec::new();
     let mut cpu_total = 0;
+    let uptime = procfs::Uptime::new().unwrap().uptime;
 
     for cpu in procfs::KernelStats::new().unwrap().cpu_time {
     	let mut prev:f32 = 0.0;
     	if sys_stats.cpu_hist.len() > 0 {
             prev = sys_stats.cpu_hist.front().unwrap()[cpu_count as usize]
         }
+        cpu_total += cpu.user + cpu.nice + cpu.system + cpu.idle + cpu.iowait.unwrap_or(0) + cpu.irq.unwrap_or(0) + cpu.softirq.unwrap_or(0) + cpu.steal.unwrap_or(0);// + cpu.guest.unwrap_or(0) + cpu.guest_nice.unwrap_or(0);
+        //100.0 * ((stat.utime+stat.stime) - prev_duration) as f32 / (cpu_total - sys_stats._cpu_total) as f32 * cpu_count as f32
         cpus_usage.push( (cpu.idle as f32 - prev/100.0 * config.update_freq) /config.update_freq*100.0 );
         cpu_count += 1;
-        cpu_total += cpu.user + cpu.nice + cpu.system + cpu.idle + cpu.iowait.unwrap_or(0) + cpu.irq.unwrap_or(0) + cpu.softirq.unwrap_or(0) + cpu.steal.unwrap_or(0) + cpu.guest.unwrap_or(0) + cpu.guest_nice.unwrap_or(0);
     }
 
     for prc in procfs::process::all_processes().unwrap() {
@@ -257,9 +259,10 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
             },
             Err(_e) => {},
         };
-        log_data(&mut procs[i].cpu_hist, 10.0 * ((stat.utime+stat.stime) - prev_duration) as f32 / (cpu_total - sys_stats._cpu_total) as f32 / cpu_count as f32, config); // cpu percent time utilization
-
-        // log_data(&mut procs[i].cpu_hist, ((stat.utime+stat.stime) as f32 * 100.0) / (procfs::Uptime::new().unwrap().uptime as f64 - stat.starttime as f64) as f32, config); // cpu percent time utilization
+        //log_data(&mut procs[i].cpu_hist, 100.0 * ((stat.utime+stat.stime) - prev_duration) as f32 / ((cpu_total - sys_stats._cpu_total) as f32 / cpu_count as f32) as f32, config); // cpu percent time utilization
+        //log_data(&mut procs[i].cpu_hist, ((cpu_total - sys_stats._cpu_total) - ()) as f32 / (cpu_total - sys_stats._cpu_total) as f32 * 100.0, config); // cpu percent time utilization
+        
+        log_data(&mut procs[i].cpu_hist, ((stat.utime+stat.stime)/ticks_per_second()) as f32  / (uptime as f32 - (stat.starttime/ticks_per_second()) as f32) as f32, config); // cpu percent time utilization
         
         let _prcio = match prc.io() {
             Ok(prcio) => {log_data(&mut procs[i].disk_hist, (prcio.write_bytes/(1024*1024)) as u32, config); // cpu percent time utilization
@@ -291,7 +294,7 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
     }
 
     // UPDATE SYSTEM DATA
-    sys_stats.uptime = procfs::Uptime::new().unwrap().uptime;
+    sys_stats.uptime = uptime;
     
     sys_stats.mem_total = procfs::Meminfo::new().unwrap().mem_total as u32 / (1024*1024) as u32;
     log_data(&mut sys_stats.cpu_hist, cpus_usage, config);

@@ -107,12 +107,13 @@ enum BasicColumn {
     PID,
     PPID,
     CMD,
-    CPU,
-    OWNER,
-    DIR,
     PRIORITY,
+    CPU,
+    MEM,
     STATE,
-    RUNTIME
+    STARTTIME,
+    OWNER,
+    FD,
 }
 
 impl BasicColumn {
@@ -120,13 +121,14 @@ impl BasicColumn {
         match *self {
             BasicColumn::PID => "PID",
             BasicColumn::PPID => "PPID",
-            BasicColumn::CMD => "CMD",
-            BasicColumn::CPU => "CPU",
-            BasicColumn::OWNER => "OWNER",
-            BasicColumn::DIR => "DIR",
+            BasicColumn::CMD => "CMD/Name",
             BasicColumn::PRIORITY => "PRIORITY",
+            BasicColumn::CPU => "CPU",
+            BasicColumn::MEM => "MEM",
             BasicColumn::STATE => "STATE",
-            BasicColumn::RUNTIME => "RUNTIME",
+            BasicColumn::STARTTIME => "StartTime",
+            BasicColumn::OWNER => "OWNER",
+            BasicColumn::FD => "FDs",
         }
     }
 }
@@ -139,12 +141,15 @@ impl TableViewItem<BasicColumn> for Process {
             BasicColumn::PID => format!("{}", self.pid),
             BasicColumn::PPID => format!("{}", self.parent_pid),
             BasicColumn::CMD => self.name.to_string(),
-            BasicColumn::CPU => format!("{:.4}", self.cpu_hist.front().unwrap() * 100 as f32),
-            BasicColumn::OWNER => self.owner.to_string(),
-            BasicColumn::DIR => self.dir.display().to_string(),
             BasicColumn::PRIORITY => format!("{}", self.priority),
+            BasicColumn::CPU => format!("{:.4}", self.cpu_hist.front().unwrap() * 100 as f32),
+            // BasicColumn::MEM => format!("{:.4}", ((self.ram_hist.front().unwrap() * 100) as f32/self._mem_total as f32)),
+            BasicColumn::MEM => format!("{:.4}", self.ram_hist.front().unwrap()),
             BasicColumn::STATE => format!("{:?}", self.state.procstate),
-            BasicColumn::RUNTIME => format!("{}", self.run_duration),
+            // BasicColumn::STATE => format!("{:?}", self.state),
+            BasicColumn::STARTTIME => self.start_time.to_rfc2822(),
+            BasicColumn::OWNER => self.owner.to_string(),
+            BasicColumn::FD => format!("{}", self.open_fds),
         }
     }
 
@@ -153,15 +158,16 @@ impl TableViewItem<BasicColumn> for Process {
             BasicColumn::PID => self.pid.cmp(&other.pid),
             BasicColumn::PPID => self.parent_pid.cmp(&other.parent_pid),
             BasicColumn::CMD => self.name.cmp(&other.name),
-            BasicColumn::CPU => self.cpu_hist.back().unwrap().partial_cmp(&other.cpu_hist.back().unwrap()).unwrap_or(Ordering::Equal),
-            BasicColumn::OWNER => self.owner.cmp(&other.owner),
-            BasicColumn::DIR => self.dir.cmp(&other.dir),
             BasicColumn::PRIORITY => self.priority.cmp(&other.priority),
+            BasicColumn::CPU => self.cpu_hist.front().unwrap().partial_cmp(&other.cpu_hist.front().unwrap()).unwrap_or(Ordering::Equal),
+            BasicColumn::MEM => self.ram_hist.front().unwrap().cmp(&other.ram_hist.front().unwrap()),
             BasicColumn::STATE => format!("{:?}", self.state.procstate).cmp(&format!("{:?}", &other.state.procstate)),
-            BasicColumn::RUNTIME => self.run_duration.cmp(&other.run_duration),
+            // BasicColumn::STATE => self.state.cmp(&other.state),
+            BasicColumn::STARTTIME => self.start_time.cmp(&other.start_time),
+            BasicColumn::OWNER => self.owner.cmp(&other.owner),
+            BasicColumn::FD => self.open_fds.cmp(&other.open_fds),
         }
     }
-
 }
 
 
@@ -393,14 +399,27 @@ fn display_tui()
             .align(HAlign::Right)
             .width_percent(5)
         })
-        .column(BasicColumn::PPID, "PPID", |c| c.align(HAlign::Right).width_percent(5))
-        .column(BasicColumn::CMD, "CMD", |c| c.align(HAlign::Right).width_percent(25))
-        .column(BasicColumn::CPU, "CPU", |c| c.align(HAlign::Right).width_percent(5))
-        .column(BasicColumn::OWNER, "OWNER", |c| c.align(HAlign::Right).width_percent(7))
-        .column(BasicColumn::DIR, "DIR", |c| c.align(HAlign::Right).width_percent(25))
-        .column(BasicColumn::PRIORITY, "PRIORITY", |c| c.align(HAlign::Right).width_percent(5))
-        .column(BasicColumn::STATE, "STATE", |c| c.align(HAlign::Right).width_percent(5))
-        .column(BasicColumn::RUNTIME, "RUNTIME", |c| c.align(HAlign::Right).width_percent(10));
+        .column(BasicColumn::PPID, "PPID", |c| c.align(HAlign::Right))
+        .column(BasicColumn::CMD, "CMD", |c| c.align(HAlign::Right))
+        .column(BasicColumn::PRIORITY, "PRIORITY", |c| c.align(HAlign::Right))
+        .column(BasicColumn::CPU, "CPU", |c| c.align(HAlign::Right))
+        .column(BasicColumn::MEM, "MEM", |c| c.align(HAlign::Right))
+        .column(BasicColumn::STATE, "STATE", |c| c.align(HAlign::Right))
+        .column(BasicColumn::STARTTIME, "STARTTIME", |c| c.align(HAlign::Right))
+        .column(BasicColumn::OWNER, "OWNER", |c| c.align(HAlign::Right))
+        .column(BasicColumn::FD, "FD", |c| c.align(HAlign::Right));
+
+        // BasicColumn::PID => "PID",
+        // BasicColumn::PPID => "PPID",
+        // BasicColumn::CMD => "CMD/Name",
+        // BasicColumn::PRIORITY => "PRIORITY",
+        // BasicColumn::CPU => "CPU",
+        // BasicColumn::MEM => "MEM",
+        // BasicColumn::STATE => "STATE",
+        // BasicColumn::STARTTIME => "StartTime",
+        // BasicColumn::OWNER => "OWNER",
+        // BasicColumn::FD => "FDs",
+
     
     table.set_items(procs.clone());
 
@@ -430,7 +449,7 @@ fn display_tui()
                     )
                     .child(LinearLayout::horizontal()
                         .child(TextView::new(format!("System Uptime: {}s", sys_stats.uptime)).h_align(HAlign::Left).with_name("uptime").full_width())
-                        .child(TextView::new(format!("Total Memory: {}MB", sys_stats.mem_total)).h_align(HAlign::Left).with_name("mem_total").full_width())
+                        .child(TextView::new(format!("Memory: {}/{} MB",sys_stats.ram_hist.front().unwrap(), sys_stats.mem_total)).h_align(HAlign::Left).with_name("mem_total").full_width())
                     )
                     .child(LinearLayout::horizontal()
                         .child(TextView::new(format!("Swap Usage: {}%", sys_stats.swap_hist.front().unwrap())).h_align(HAlign::Left).with_name("swap_usage").full_width())
@@ -479,7 +498,7 @@ fn update_views(siv: &mut Cursive, procs: &mut Vec<Process>, pid_table: &mut Has
             view.set_content(format!("System Uptime: {}s", sys_stats.uptime));
         });
         siv.call_on_name("mem_total", |view: &mut TextView| {
-            view.set_content(format!("Total Memory: {}MB", sys_stats.mem_total));
+            view.set_content(format!("Memory: {}/{}MB", sys_stats.ram_hist.front().unwrap(), sys_stats.mem_total));
         });
         siv.call_on_name("swap_usage", |view: &mut TextView| {
             view.set_content(format!("Swap Usage: {}%", sys_stats.swap_hist.front().unwrap()));

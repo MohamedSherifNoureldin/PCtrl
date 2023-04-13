@@ -270,7 +270,7 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
         
         let prev_duration = procs[i]._prev_duration;
         let _statm =  match prc.statm() {
-            Ok(statm) => { log_data(&mut procs[i].ram_hist, (statm.size / 256) as u32, config); // size in mb 
+            Ok(statm) => { log_data(&mut procs[i].ram_hist, (stat.rss_bytes() / (1000*1000)) as u32, config); // size in mb 
             },
             Err(_e) => {},
         };
@@ -311,12 +311,12 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
     // UPDATE SYSTEM DATA
     sys_stats.uptime = uptime;
     
-    sys_stats.mem_total = (10 * procfs::Meminfo::new().unwrap().mem_total as u64 / (1024*1024) as u64) as u32;
+    sys_stats.mem_total = (procfs::Meminfo::new().unwrap().mem_total as u64 / (1024*1024) as u64) as u32;
     log_data(&mut sys_stats.cpu_hist, cpus_usage, config);
     // if sys_stats.disk_hist.len() > 2 {
     //     println!("systemcpu: {}", 0.5 * (cpus_usage[0] + cpus_usage[1]) );
     // }
-    log_data(&mut sys_stats.ram_hist ,((procfs::Meminfo::new().unwrap().mem_total as u64 - procfs::Meminfo::new().unwrap().mem_free) / 1024) as u32, config);
+    log_data(&mut sys_stats.ram_hist ,((procfs::Meminfo::new().unwrap().mem_total as u64 - procfs::Meminfo::new().unwrap().mem_free) / (1024*1024)) as u32, config);
     let mut sum = 0;
     for d in procfs::diskstats().unwrap() {
         sum += d.sectors_written;

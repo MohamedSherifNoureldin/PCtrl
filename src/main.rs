@@ -209,7 +209,7 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
     for prc in procfs::process::all_processes().unwrap() {
         let prc = prc.unwrap();
         let stat = prc.stat().unwrap();
-        if (!prc.is_alive()) {continue};  //For only reading alive proces, ie not dead or zombie
+        if !prc.is_alive() {continue};  //For only reading alive proces, ie not dead or zombie
         
         proc_count += 1;
         let i: usize;
@@ -238,8 +238,8 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
             cmd.push_str(&format!("{} ", entry));
         }
         
-        if (cmd.is_empty()) {
-            procs[i].name = stat.comm.clone();;
+        if cmd.is_empty() {
+            procs[i].name = stat.comm.clone();
         }
         else {
             procs[i].name = cmd;
@@ -424,7 +424,7 @@ fn display_tui()
     table.set_items(procs.clone());
 
     // Detect clicks on column headers
-    table.set_on_sort(|siv: &mut Cursive, column: BasicColumn, order: Ordering| {
+    table.set_on_sort(|siv: &mut Cursive, column: BasicColumn, order: Ordering| {        
         siv.add_layer(
             Dialog::around(TextView::new(format!("{} / {:?}", column.as_str(), order)))
                 .title("Sorted by")
@@ -507,7 +507,9 @@ fn update_views(siv: &mut Cursive, procs: &mut Vec<Process>, pid_table: &mut Has
             view.set_content(format!("Number of processes: {}", sys_stats.user_proc_count));
         });
         siv.call_on_name("table", |view: &mut TableView<Process, BasicColumn>| {
+            let selected_row = view.row().unwrap() as usize;
             view.set_items_stable(procs.clone());
+            view.set_selected_row(selected_row);
         });
     }
 }
@@ -552,7 +554,7 @@ fn record_prc(procs:Vec<Process>, pid_table: &mut HashMap<u32, u16>, pid: u32, r
     //     Ok(file) => {},//println!("{:?}", file),
     //     Err(_) => println!("Unable to create the file: '{}'", file_name)
     // }
-    if (pid_table[&pid] > procs.len() as u16) {
+    if pid_table[&pid] > procs.len() as u16 {
         println!("Err in records proc: couldn't find pid!");
         return
     }

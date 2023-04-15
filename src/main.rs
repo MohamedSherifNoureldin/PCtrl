@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use std::fs::{read_to_string, File};
 use std::io::Write;
 
+
 use std::num::NonZeroU32;
 use chrono::{DateTime, Local};
 
@@ -123,8 +124,8 @@ impl BasicColumn {
             BasicColumn::PPID => "PPID",
             BasicColumn::CMD => "CMD/Name",
             BasicColumn::PRIORITY => "PRIORITY",
-            BasicColumn::CPU => "CPU",
-            BasicColumn::MEM => "MEM",
+            BasicColumn::CPU => "CPU %",
+            BasicColumn::MEM => "MEM %",
             BasicColumn::STATE => "STATE",
             BasicColumn::STARTTIME => "StartTime",
             BasicColumn::OWNER => "OWNER",
@@ -143,11 +144,15 @@ impl TableViewItem<BasicColumn> for Process {
             BasicColumn::CMD => self.name.to_string(),
             BasicColumn::PRIORITY => format!("{}", self.priority),
             BasicColumn::CPU => format!("{:.4}", self.cpu_hist.front().unwrap() * 100 as f32),
-            // BasicColumn::MEM => format!("{:.4}", ((self.ram_hist.front().unwrap() * 100) as f32/self._mem_total as f32)),
-            BasicColumn::MEM => format!("{:.4}", self.ram_hist.front().unwrap()),
+            BasicColumn::MEM => 
+                if self._mem_total == 0 {
+                    format!("0.0000")
+                } else {
+                    format!("{:.4}", ((self.ram_hist.front().unwrap() * 100) as f32/self._mem_total as f32))
+                },
+            // BasicColumn::MEM => format!("{:.4}", self.ram_hist.front().unwrap()),
             BasicColumn::STATE => format!("{:?}", self.state.procstate),
-            // BasicColumn::STATE => format!("{:?}", self.state),
-            BasicColumn::STARTTIME => self.start_time.to_rfc2822(),
+            BasicColumn::STARTTIME => format!("{}", self.start_time.format("%d/%m/%Y %H:%M")),
             BasicColumn::OWNER => self.owner.to_string(),
             BasicColumn::FD => format!("{}", self.open_fds),
         }
@@ -162,14 +167,12 @@ impl TableViewItem<BasicColumn> for Process {
             BasicColumn::CPU => self.cpu_hist.front().unwrap().partial_cmp(&other.cpu_hist.front().unwrap()).unwrap_or(Ordering::Equal),
             BasicColumn::MEM => self.ram_hist.front().unwrap().cmp(&other.ram_hist.front().unwrap()),
             BasicColumn::STATE => format!("{:?}", self.state.procstate).cmp(&format!("{:?}", &other.state.procstate)),
-            // BasicColumn::STATE => self.state.cmp(&other.state),
             BasicColumn::STARTTIME => self.start_time.cmp(&other.start_time),
             BasicColumn::OWNER => self.owner.cmp(&other.owner),
             BasicColumn::FD => self.open_fds.cmp(&other.open_fds),
         }
     }
 }
-
 
 // function to add data to the linked list
 fn log_data<T>(list: &mut LinkedList<T>, val:T, config: Config) { // all stat data entry should be through this function 
@@ -181,7 +184,6 @@ fn log_data<T>(list: &mut LinkedList<T>, val:T, config: Config) { // all stat da
 
 // function to read system wide processes along with system wide data and update the data structures
 fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys_stats: &mut SysStats, config: Config) {
-    //let tps = procfs::ticks_per_second();
     let mut child_queue: Vec<(u32, u32)> = Vec::new(); // ppid, pid
     let mut total_net = 0;
     let mut proc_count = 0;
@@ -344,8 +346,7 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
 }
 
 // function to display the TUI
-fn display_tui()
-{
+fn display_tui(columns_to_display: Vec<String>) {
     let mut counter: u32 = 0;
 
     let mut pid_table: HashMap<u32, u16> = HashMap::new();
@@ -367,6 +368,7 @@ fn display_tui()
         _idle:0,
     };
     let config = Config { record_length: 5, update_freq: 1.0 };
+
 
     update_procs(&mut pid_table, &mut procs, &mut sys_stats, config);
 
@@ -393,34 +395,41 @@ fn display_tui()
         }
     });
 
-    let mut table = TableView::<Process, BasicColumn>::new()
-        .column(BasicColumn::PID, "PID", |c| {
-            c.ordering(Ordering::Less)
-            .align(HAlign::Right)
-            .width_percent(5)
-        })
-        .column(BasicColumn::PPID, "PPID", |c| c.align(HAlign::Right))
-        .column(BasicColumn::CMD, "CMD", |c| c.align(HAlign::Right))
-        .column(BasicColumn::PRIORITY, "PRIORITY", |c| c.align(HAlign::Right))
-        .column(BasicColumn::CPU, "CPU", |c| c.align(HAlign::Right))
-        .column(BasicColumn::MEM, "MEM", |c| c.align(HAlign::Right))
-        .column(BasicColumn::STATE, "STATE", |c| c.align(HAlign::Right))
-        .column(BasicColumn::STARTTIME, "STARTTIME", |c| c.align(HAlign::Right))
-        .column(BasicColumn::OWNER, "OWNER", |c| c.align(HAlign::Right))
-        .column(BasicColumn::FD, "FD", |c| c.align(HAlign::Right));
+    let mut table = TableView::<Process, BasicColumn>::new();
+        // .column(BasicColumn::PID, "PID", |c| {
+        //     c.ordering(Ordering::Less)
+        //     .align(HAlign::Right)
+        //     .width(6)
+        // })
+        // .column(BasicColumn::PPID, "PPID", |c| c.align(HAlign::Right).width(8))
+        // .column(BasicColumn::PRIORITY, "PRI", |c| c.align(HAlign::Right).width(6))
+        // .column(BasicColumn::CPU, "CPU %", |c| c.align(HAlign::Right).width(9))
+        // .column(BasicColumn::MEM, "MEM %", |c| c.align(HAlign::Right).width(9))
+        // .column(BasicColumn::STATE, "STATE", |c| c.align(HAlign::Right).width(9))
+        // .column(BasicColumn::STARTTIME, "STARTTIME", |c| c.align(HAlign::Right).width(17))
+        // .column(BasicColumn::FD, "FD", |c| c.align(HAlign::Right).width(6))
+        // .column(BasicColumn::OWNER, "OWNER", |c| c.align(HAlign::Right).width(20))
+        // .column(BasicColumn::CMD, "CMD", |c| c.align(HAlign::Right));
 
-        // BasicColumn::PID => "PID",
-        // BasicColumn::PPID => "PPID",
-        // BasicColumn::CMD => "CMD/Name",
-        // BasicColumn::PRIORITY => "PRIORITY",
-        // BasicColumn::CPU => "CPU",
-        // BasicColumn::MEM => "MEM",
-        // BasicColumn::STATE => "STATE",
-        // BasicColumn::STARTTIME => "StartTime",
-        // BasicColumn::OWNER => "OWNER",
-        // BasicColumn::FD => "FDs",
-
-    
+    for col_name in columns_to_display {
+            match col_name.as_str() {
+                "PID" => table = table.column(BasicColumn::PID, "PID", |c| {
+                    c.ordering(Ordering::Less)
+                    .align(HAlign::Right)
+                    .width(6)
+                }),
+                "PPID" => table = table.column(BasicColumn::PPID, "PPID", |c| c.align(HAlign::Right).width(8)),
+                "PRI" => table = table.column(BasicColumn::PRIORITY, "PRI", |c| c.align(HAlign::Right).width(6)),
+                "CPU" => table = table.column(BasicColumn::CPU, "CPU %", |c| c.align(HAlign::Right).width(9)),
+                "MEM" => table = table.column(BasicColumn::MEM, "MEM %", |c| c.align(HAlign::Right).width(9)),
+                "STATE" => table = table.column(BasicColumn::STATE, "STATE", |c| c.align(HAlign::Right).width(9)),
+                "STARTTIME" => table = table.column(BasicColumn::STARTTIME, "STARTTIME", |c| c.align(HAlign::Right).width(17)),
+                "FD" => table = table.column(BasicColumn::FD, "FD", |c| c.align(HAlign::Right).width(6)),
+                "OWNER" => table = table.column(BasicColumn::OWNER, "OWNER", |c| c.align(HAlign::Right).width(20)),
+                "CMD" => table = table.column(BasicColumn::CMD, "CMD", |c| c.align(HAlign::Right)),
+                _ => { println!("Invalid column name: {}", col_name); }
+            }
+        }
     table.set_items(procs.clone());
 
     // Detect clicks on column headers
@@ -444,7 +453,7 @@ fn display_tui()
                         .child(TextView::new(format!("CPU Frequency: {}MHz", sys_stats.cpu_freq)).h_align(HAlign::Left).with_name("cpu_freq").full_width())
                     )
                     .child(LinearLayout::horizontal()
-                        .child(TextView::new(format!("CPU Temperature: {} \u{00b0C}", sys_stats.cpu_temp)).h_align(HAlign::Left).with_name("cpu_temp").full_width())
+                        .child(TextView::new(format!("CPU Temperature: {} \u{00b0}\u{0043}", sys_stats.cpu_temp)).h_align(HAlign::Left).with_name("cpu_temp").full_width())
                         .child(TextView::new(format!("Number of cores: {}", sys_stats.cpu_cores_num)).h_align(HAlign::Left).with_name("cpu_cores_num").full_width())
                     )
                     .child(LinearLayout::horizontal()
@@ -464,6 +473,24 @@ fn display_tui()
                 .child(TextView::new("Status: Updating in realtime...").h_align(HAlign::Right).with_name("status").full_width()
             )).title("Controls"))
     );
+
+    // add a callback to kill process when user presses 'k' while selecting a row
+    siv.add_global_callback('k',   |s| {
+        let mut pid = 0;
+        s.call_on_name("table", |view: &mut TableView<Process, BasicColumn>| {
+            let selected_row = view.item().unwrap() as usize;
+            let selected_item = view.borrow_item(selected_row).unwrap().clone();
+            pid = selected_item.pid;
+            kill_process(pid);
+        });
+        s.add_layer(
+            Dialog::around(TextView::new(format!("{}", pid)))
+                .title("KIlling process")
+                .button("Close", |s| {
+                    s.pop_layer();
+                }),
+        );
+    });
 
 
     siv.add_global_callback(cursive::event::Event::Refresh, move |s| {
@@ -489,7 +516,7 @@ fn update_views(siv: &mut Cursive, procs: &mut Vec<Process>, pid_table: &mut Has
             view.set_content(format!("CPU Frequency: {}MHz", sys_stats.cpu_freq));
         });
         siv.call_on_name("cpu_temp", |view: &mut TextView| {
-            view.set_content(format!("CPU Temperature: {} \u{00b0C}", sys_stats.cpu_temp));
+            view.set_content(format!("CPU Temperature: {} \u{00b0}\u{0043}", sys_stats.cpu_temp));
         });
         siv.call_on_name("cpu_cores_num", |view: &mut TextView| {
             view.set_content(format!("Number of cores: {}", sys_stats.cpu_cores_num));
@@ -530,6 +557,7 @@ fn custom_theme_from_cursive(siv: &Cursive) -> Theme {
     theme
 }
 
+use clap::{Command, Arg, ArgAction};
 // main function
 fn main() {
     // main structures
@@ -539,9 +567,25 @@ fn main() {
     let _config : Config = Config::start();
 
     let mut recording_procs: Vec<u32>; // pass this to record_prc function, any proc to be recorded should be added to this
+    
+    // parse command line arguments
+    let matches = Command::new("lpm")
+        .version("0.1.0")
+        .arg(
+            clap::Arg::new("columns")
+                .short('c')
+                .long("columns")
+                .value_delimiter(',')
+                .value_name("COLUMN_LIST")
+                .help("Comma-separated list of columns to display, in the order they should appear")
+                .default_value("PID,PPID,PRI,CPU,MEM,STATE,STARTTIME,FD,OWNER,CMD")
+                .action(ArgAction::Append),
+        )
+        .get_matches();
 
+let columns_to_display = matches.get_many::<String>("columns").unwrap().map(|s| s.trim().to_string().to_uppercase()).collect();
     // test_update_procs();
-    display_tui();
+    display_tui(columns_to_display);
 }
 
 static mut PAUSE_REC:bool = false;
@@ -587,4 +631,15 @@ fn record_prc(procs:Vec<Process>, pid_table: &mut HashMap<u32, u16>, pid: u32, r
 
 fn read_record(pid: u32) {
 
+}
+
+// function to kill the running process
+fn kill_process(pid: u32) -> bool {
+    let output = std::process::Command::new("kill")
+        .arg("-9")
+        .arg(pid.to_string())
+        .output()
+        .expect("failed to execute process");
+
+    output.status.success()
 }

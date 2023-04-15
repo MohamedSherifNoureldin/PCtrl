@@ -15,3 +15,5 @@ cursive = { version = "0.20", features = ["toml"] }
 cursive_table_view = "0.14"
 chrono = "0.4.24"
 clap = "4.2.2"
+dirs = "5.0"
+sysinfo = "0.28.4"

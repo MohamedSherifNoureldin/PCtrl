@@ -2,16 +2,16 @@
 use std::collections::LinkedList;
 use std::vec::Vec;
 use std::collections::HashMap;
-use std::path::PathBuf;
-use std::fs::{read_to_string, File};
+use std::path::{Path};
+use std::fs::{read_to_string, File}; // use unsafe with static muts for static lifetime of main structures
 use std::io::Write;
 
 
 use std::num::NonZeroU32;
-use chrono::{DateTime, Local};
+//use chrono::{DateTime, Local};
 
 use users::{get_user_by_uid, get_group_by_gid, Group}; // library for linux users
-use procfs::{process::{ProcState}, ticks_per_second}; // proc reading library
+use procfs::{ticks_per_second, Meminfo}; // proc reading library
 
 // cursive TUI imports
 use cursive::Cursive;
@@ -23,99 +23,15 @@ use cursive::align::HAlign;
 use cursive::traits::*;
 use std::cmp::Ordering;
 extern crate cursive_table_view;
+extern crate dirs;
 
-// structure for holding a single process data
-#[derive(Default, Clone, Debug, PartialEq)]
-struct Process {
-    pid: u32,
-    parent_pid: u32,
-    children: Vec<u32>,
-    name: String,
-    owner: String,
-    group: String,
-    priority: u8,
-    state: PState,
-    open_fds: u16,
-    run_duration: u32,
-    start_time: DateTime<Local>, // to string via .to_rfc2822()
-    dir: PathBuf, // program location as a pathbuf  
-    _mem_total: u32,
-                  //do .into_os_string().into_string().unwrap() to convert to string
-    _prev_duration: u64,
-    //Data Record
-    cpu_hist:  LinkedList<f32>,
-    ram_hist:  LinkedList<u32>,  //   units is megabytes
-    disk_hist: LinkedList<u32>,  //   units is megabytes
-    net_hist:  LinkedList<u32>,  //   units is megabytes
-    swap_hist: LinkedList<u16>, //   units is megabytes
-}
+use std::fs::OpenOptions;
+use std::io::{Seek, SeekFrom};
+use std::{thread, time::Duration};
+use std::fs::create_dir;
 
-// setting the default state of the process to running
-#[derive(Clone, Debug, PartialEq)]
-struct PState{
-    procstate: ProcState
-}
-impl Default for PState {
-    fn default() -> Self {
-        Self {
-            procstate: ProcState::Running
-        }
-    }
-}
-
-// structure for holding system wide data
-#[derive(Default)]
-struct SysStats {
-    cpu_name: String,
-    cpu_freq: u16,
-    cpu_temp: i8,
-    cpu_cores_num: u8,
-    uptime: f64, // in seconds
-    mem_total: u32, // in megabytes
-    
-    user_proc_count: u32,
-
-    // Records
-    cpu_hist: LinkedList<Vec<f32>>, // vector of usage per cpu core
-    ram_hist:  LinkedList<u32>,
-    disk_hist:  LinkedList<u32>, // change type according to units
-    net_hist:  LinkedList<u32>, // change type according to units
-    swap_hist:  LinkedList<u16>,
-
-    _cpu_total: u64,
-    _idle: u64,
-}
-
-// structure for holding the user's configuration data
-#[derive(Copy, Clone)]
-struct Config {
-    record_length : u32,
-    update_freq : f32,
-}
-impl Config {
-    fn start() -> Config {
-        // reaf config file and assign to config
-        Config {
-            record_length: 10,
-            update_freq : 0.1,
-        }
-    }
-}
-
-// TUI table columns enum along with their string representation
-#[derive(Copy, Clone, PartialEq, Eq, Hash)]
-enum BasicColumn {
-    PID,
-    PPID,
-    CMD,
-    PRIORITY,
-    CPU,
-    MEM,
-    STATE,
-    STARTTIME,
-    OWNER,
-    FD,
-}
+pub mod structures;
+use structures::*;
 
 impl BasicColumn {
     fn as_str(&self) -> &str {
@@ -194,9 +110,7 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
     let uptime = procfs::Uptime::new().unwrap().uptime;
 
     for cpu in procfs::KernelStats::new().unwrap().cpu_time {
-    	//let mut prev:f32 = 0.0;
     	if sys_stats.cpu_hist.len() > 0 {
-            //prev = sys_stats.cpu_hist.front().unwrap()[cpu_count as usize]
         }
         cpu_total = cpu.user + cpu.nice + cpu.system + cpu.idle + cpu.iowait.unwrap_or(0) + cpu.irq.unwrap_or(0) + cpu.softirq.unwrap_or(0) + cpu.steal.unwrap_or(0);// + cpu.guest.unwrap_or(0) + cpu.guest_nice.unwrap_or(0);
         //100.0 * ((stat.utime+stat.stime) - prev_duration) as f32 / (cpu_total - sys_stats._cpu_total) as f32 * cpu_count as f32
@@ -207,12 +121,23 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
         sys_stats._idle = idle;
         cpu_count += 1;
     }
+    let mut last_read : u32 = 1;
 
     for prc in procfs::process::all_processes().unwrap() {
         let prc = prc.unwrap();
         let stat = prc.stat().unwrap();
         if !prc.is_alive() {continue};  //For only reading alive proces, ie not dead or zombie
         
+        if stat.pid - last_read as i32 > 1 {
+            for i in (last_read+1)..(stat.pid as u32) {
+                if pid_table.contains_key(&i) {
+                    procs.remove(pid_table[&i] as usize);
+                    pid_table.remove(&i);
+                }
+            }
+        }
+        last_read = stat.pid as u32;
+
         proc_count += 1;
         let i: usize;
         if pid_table.contains_key(&(stat.pid as u32)) {
@@ -305,6 +230,12 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
 
         procs[i]._prev_duration = stat.utime+stat.stime;
     }
+    for i in (last_read+1)..(procs[procs.len() -1].pid+1 as u32) { // check if latest procs have ended
+        if pid_table.contains_key(&i) {
+            procs.remove(pid_table[&i] as usize);
+            pid_table.remove(&i);
+        }
+    }
     // check for any missed children procs assignment
     for entry in child_queue {
         procs[ pid_table[&entry.0] as usize].children.push(entry.1 as u32); // add missing children 
@@ -312,20 +243,21 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
 
     // UPDATE SYSTEM DATA
     sys_stats.uptime = uptime;
-    
-    sys_stats.mem_total = (procfs::Meminfo::new().unwrap().mem_total as u64 / (1024*1024) as u64) as u32;
+    let meminfo = Meminfo::new().unwrap();
+    sys_stats.mem_total = (meminfo.mem_total as u64 / (1024*1024) as u64) as u32;
     log_data(&mut sys_stats.cpu_hist, cpus_usage, config);
     // if sys_stats.disk_hist.len() > 2 {
     //     println!("systemcpu: {}", 0.5 * (cpus_usage[0] + cpus_usage[1]) );
     // }
-    log_data(&mut sys_stats.ram_hist ,((procfs::Meminfo::new().unwrap().mem_total as u64 - procfs::Meminfo::new().unwrap().mem_free) / (1024*1024)) as u32, config);
+    //usedMem -= buffersMem + cachedMem;
+    log_data(&mut sys_stats.ram_hist ,sys_stats.mem_total -  ((meminfo.mem_free) / (1024*1024)) as u32, config);
     let mut sum = 0;
     for d in procfs::diskstats().unwrap() {
         sum += d.sectors_written;
     }
     log_data(&mut sys_stats.disk_hist , (sum * 512/(1024*1024)) as u32, config);
     log_data(&mut sys_stats.net_hist , (total_net/1024) as u32, config); // in mb
-    log_data(&mut sys_stats.swap_hist ,((procfs::Meminfo::new().unwrap().swap_total - procfs::Meminfo::new().unwrap().swap_free) / 1024) as u16, config);
+    log_data(&mut sys_stats.swap_hist ,((meminfo.swap_total - meminfo.swap_free) / (1024 * 1024)) as u16, config);
     sys_stats.cpu_cores_num = cpu_count;
     sys_stats.user_proc_count = proc_count;
     
@@ -601,13 +533,19 @@ let columns_to_display = matches.get_many::<String>("columns").unwrap().map(|s| 
 static mut PAUSE_REC:bool = false;
  
 
-fn record_prc(procs:Vec<Process>, pid_table: &mut HashMap<u32, u16>, pid: u32, recording_procs: Vec<u32>, config: Config) { // recordings exist in "/usr/local/pctrl/", process record format is plog
-    let file_name = format!("/usr/local/pctrl/pctrl_{}.plog", pid);
-    let mut file = File::create(format!("/usr/local/pctrl/pctrl_{}.plog", pid)).unwrap();
-    // match File::create(file_name) {
-    //     Ok(file) => {},//println!("{:?}", file),
-    //     Err(_) => println!("Unable to create the file: '{}'", file_name)
-    // }
+fn record_prc(procs: Vec<Process>, pid_table: HashMap<u32, u16>, pid: u32, recording_procs: &'static Vec<u32>, config: &'static Config) { // recordings exist in "/usr/local/pctrl/", process record format is plog
+    let home = dirs::home_dir().unwrap().into_os_string().into_string().unwrap();
+    let file_name = format!("{}/.local/share/pctrl/pctrl_{}.plog", home, pid);    
+    println!("{}/.local/share/pctrl", home);
+    if !Path::new(&format!("{}/.local/share/pctrl", home)).exists() {
+        create_dir(&format!("{}/.local/share/pctrl", home)).unwrap();
+    }
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create(true)
+        //.create_new(true)
+        .open(file_name)
+        .unwrap();
     if pid_table[&pid] > procs.len() as u16 {
         println!("Err in records proc: couldn't find pid!");
         return
@@ -623,17 +561,7 @@ fn record_prc(procs:Vec<Process>, pid_table: &mut HashMap<u32, u16>, pid: u32, r
         counter += 1;
         if counter > config.record_length {
             // remove from beginning of file
-            if which_file {
-                file = File::create(format!("/usr/local/pctrl/pctrl_{}.plog", pid)).unwrap(); 
-                which_file = false; 
-                //Ok(())
-            }
-            else {
-                file = File::create(format!("/usr/local/pctrl/pctrl_{}.plog1", pid)).unwrap();
-                which_file = true;
-                //Ok(())
-            }
-
+            file.seek(SeekFrom::Start(0)).unwrap();
             counter = 0;
         }
     }

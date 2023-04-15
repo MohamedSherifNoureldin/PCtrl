@@ -1,11 +1,13 @@
 #![feature(linked_list_cursors)]
 use std::collections::LinkedList;
+use std::os::unix::raw::pid_t;
 use std::vec::Vec;
 use std::collections::HashMap;
 use std::path::{Path};
 use std::fs::{read_to_string, File}; // use unsafe with static muts for static lifetime of main structures
 use std::io::Write;
 
+use once_cell::sync::Lazy;
 
 use std::num::NonZeroU32;
 //use chrono::{DateTime, Local};
@@ -29,6 +31,7 @@ use std::fs::OpenOptions;
 use std::io::{Seek, SeekFrom};
 use std::{thread, time::Duration};
 use std::fs::create_dir;
+use clap::{Command, Arg, ArgAction};
 
 pub mod structures;
 use structures::*;
@@ -97,6 +100,9 @@ fn log_data<T>(list: &mut LinkedList<T>, val:T, config: Config) { // all stat da
     }
     list.push_front(val);
 }
+
+
+
 
 // function to read system wide processes along with system wide data and update the data structures
 fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys_stats: &mut SysStats, config: Config) {
@@ -281,28 +287,32 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
 fn display_tui(columns_to_display: Vec<String>) {
     let mut counter: u32 = 0;
 
-    let mut pid_table: HashMap<u32, u16> = HashMap::new();
-    let mut procs: Vec<Process> = Vec::new();
-    let mut sys_stats: SysStats = SysStats {
-        cpu_name: String::new(),
-        cpu_freq: 0,
-        cpu_temp: 0,
-        cpu_cores_num: 0,
-        uptime: 0.0,
-        mem_total: 0,
-        user_proc_count: 0,
-        cpu_hist: LinkedList::new(),
-        ram_hist: LinkedList::new(),
-        disk_hist: LinkedList::new(),
-        net_hist: LinkedList::new(),
-        swap_hist: LinkedList::new(),
-        _cpu_total:0,
-        _idle:0,
-    };
-    let config = Config { record_length: 5, update_freq: 1.0 };
+    // let mut pid_table: HashMap<u32, u16> = HashMap::new();
+    // let mut procs: Vec<Process> = Vec::new();
+    // let mut sys_stats: SysStats = SysStats {
+    //     cpu_name: String::new(),
+    //     cpu_freq: 0,
+    //     cpu_temp: 0,
+    //     cpu_cores_num: 0,
+    //     uptime: 0.0,
+    //     mem_total: 0,
+    //     user_proc_count: 0,
+    //     cpu_hist: LinkedList::new(),
+    //     ram_hist: LinkedList::new(),
+    //     disk_hist: LinkedList::new(),
+    //     net_hist: LinkedList::new(),
+    //     swap_hist: LinkedList::new(),
+    //     _cpu_total:0,
+    //     _idle:0,
+    // };
+    // let config = Config { record_length: 5, update_freq: 1.0 };
+    // let mut pid_table = unsafe{_pid_table};
+    // let mut procs = unsafe{_processes};
+    // let mut sys_stats = unsafe{_sys_stats};
+    // let mut config = unsafe{_config};
 
 
-    update_procs(&mut pid_table, &mut procs, &mut sys_stats, config);
+    unsafe{update_procs(&mut _pid_table, &mut _processes, &mut _sys_stats, *_config);}
 
     let mut siv = Cursive::default();
 
@@ -362,7 +372,7 @@ fn display_tui(columns_to_display: Vec<String>) {
                 _ => { println!("Invalid column name: {}", col_name); }
             }
         }
-    table.set_items(procs.clone());
+    unsafe{ table.set_items(_processes.clone()); }
 
     // Detect clicks on column headers
     table.set_on_sort(|siv: &mut Cursive, column: BasicColumn, order: Ordering| {        
@@ -378,26 +388,26 @@ fn display_tui(columns_to_display: Vec<String>) {
 
     siv.add_layer(
         LinearLayout::vertical()
-            .child(
+            .child( unsafe{
                 Dialog::around(LinearLayout::vertical()
                     .child(LinearLayout::horizontal()
-                        .child(TextView::new(format!("CPU Name: {}", sys_stats.cpu_name)).h_align(HAlign::Left).with_name("cpu_name").full_width())
-                        .child(TextView::new(format!("CPU Frequency: {}MHz", sys_stats.cpu_freq)).h_align(HAlign::Left).with_name("cpu_freq").full_width())
+                        .child(TextView::new(format!("CPU Name: {}", _sys_stats.cpu_name)).h_align(HAlign::Left).with_name("cpu_name").full_width())
+                        .child(TextView::new(format!("CPU Frequency: {}MHz", _sys_stats.cpu_freq)).h_align(HAlign::Left).with_name("cpu_freq").full_width())
                     )
                     .child(LinearLayout::horizontal()
-                        .child(TextView::new(format!("CPU Temperature: {} \u{00b0}\u{0043}", sys_stats.cpu_temp)).h_align(HAlign::Left).with_name("cpu_temp").full_width())
-                        .child(TextView::new(format!("Number of cores: {}", sys_stats.cpu_cores_num)).h_align(HAlign::Left).with_name("cpu_cores_num").full_width())
+                        .child(TextView::new(format!("CPU Temperature: {} \u{00b0}\u{0043}", _sys_stats.cpu_temp)).h_align(HAlign::Left).with_name("cpu_temp").full_width())
+                        .child(TextView::new(format!("Number of cores: {}", _sys_stats.cpu_cores_num)).h_align(HAlign::Left).with_name("cpu_cores_num").full_width())
                     )
                     .child(LinearLayout::horizontal()
-                        .child(TextView::new(format!("System Uptime: {}s", sys_stats.uptime)).h_align(HAlign::Left).with_name("uptime").full_width())
-                        .child(TextView::new(format!("Memory: {}/{} MB",sys_stats.ram_hist.front().unwrap(), sys_stats.mem_total)).h_align(HAlign::Left).with_name("mem_total").full_width())
+                        .child(TextView::new(format!("System Uptime: {}s", _sys_stats.uptime)).h_align(HAlign::Left).with_name("uptime").full_width())
+                        .child(TextView::new(format!("Memory: {}/{} MB",_sys_stats.ram_hist.front().unwrap(), _sys_stats.mem_total)).h_align(HAlign::Left).with_name("mem_total").full_width())
                     )
                     .child(LinearLayout::horizontal()
-                        .child(TextView::new(format!("Swap Usage: {}%", sys_stats.swap_hist.front().unwrap())).h_align(HAlign::Left).with_name("swap_usage").full_width())
-                        .child(TextView::new(format!("Number of processes: {}", sys_stats.user_proc_count)).h_align(HAlign::Left).with_name("user_proc_count").full_width())
+                        .child(TextView::new(format!("Swap Usage: {}%", _sys_stats.swap_hist.front().unwrap())).h_align(HAlign::Left).with_name("swap_usage").full_width())
+                        .child(TextView::new(format!("Number of processes: {}", _sys_stats.user_proc_count)).h_align(HAlign::Left).with_name("user_proc_count").full_width())
                     )
                 )
-                .title("System Information")
+                .title("System Information") }
             )
             .child(Dialog::around(table.with_name("table").full_screen()).title("Processes"))
             .child(Dialog::around(LinearLayout::horizontal()
@@ -433,16 +443,12 @@ fn display_tui(columns_to_display: Vec<String>) {
             );
         }
     });
-
-
     siv.add_global_callback(cursive::event::Event::Refresh, move |s| {
-        update_views(s, &mut procs, &mut pid_table, &mut sys_stats, config, counter);
+        unsafe{update_views(s, &mut _processes, &mut _pid_table, &mut _sys_stats, *_config, counter);}
         counter += 1;
     });
     siv.set_autorefresh(true);
     siv.set_fps(1);
-
-
     siv.run();
 }
 
@@ -499,14 +505,22 @@ fn custom_theme_from_cursive(siv: &Cursive) -> Theme {
     theme
 }
 
-use clap::{Command, Arg, ArgAction};
+
+// main structures
+static mut _processes : Lazy<Vec<Process>> = Lazy::new(|| Vec::new()); 
+static mut _pid_table : Lazy<HashMap<u32, u16>> = Lazy::new(|| HashMap::new());
+static mut _sys_stats : Lazy<SysStats> = Lazy::new(|| SysStats::default());
+static mut _config : Lazy<Config> = Lazy::new(|| Config::start());
+
+static mut PAUSE_REC:bool = false;
 // main function
 fn main() {
-    // main structures
-    let _processes : Vec<Process> = Vec::new(); 
-    let _get_proc : HashMap<i32, u16> = HashMap::new();
-    let _sys_stats : SysStats = SysStats::default();
-    let _config : Config = Config::start();
+    
+
+    // _processes = Vec::new(); 
+    // _pid_table = HashMap::new();
+    // _sys_stats = SysStats::default();
+    // _config= Config::start();
 
     let mut recording_procs: Vec<u32>; // pass this to record_prc function, any proc to be recorded should be added to this
     
@@ -527,10 +541,12 @@ fn main() {
 
 let columns_to_display = matches.get_many::<String>("columns").unwrap().map(|s| s.trim().to_string().to_uppercase()).collect();
     // test_update_procs();
-    display_tui(columns_to_display);
-}
+    //std::thread::spawn(|| {
 
-static mut PAUSE_REC:bool = false;
+        display_tui(columns_to_display);
+
+    //});
+}
  
 
 fn record_prc(procs: Vec<Process>, pid_table: HashMap<u32, u16>, pid: u32, recording_procs: &'static Vec<u32>, config: &'static Config) { // recordings exist in "/usr/local/pctrl/", process record format is plog

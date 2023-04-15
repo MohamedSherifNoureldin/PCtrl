@@ -469,7 +469,7 @@ fn display_tui(columns_to_display: Vec<String>) {
             )
             .child(Dialog::around(table.with_name("table").full_screen()).title("Processes"))
             .child(Dialog::around(LinearLayout::horizontal()
-                .child(TextView::new("Press <q> to exit. Press <space> to pause/unpase real time update"))
+                .child(TextView::new("Press <q> to exit. Press <space> to pause/unpase real time update.\nPress <k> while selecting a process to kill it."))
                 .child(TextView::new("Status: Updating in realtime...").h_align(HAlign::Right).with_name("status").full_width()
             )).title("Controls"))
     );
@@ -481,15 +481,25 @@ fn display_tui(columns_to_display: Vec<String>) {
             let selected_row = view.item().unwrap() as usize;
             let selected_item = view.borrow_item(selected_row).unwrap().clone();
             pid = selected_item.pid;
-            kill_process(pid);
         });
-        s.add_layer(
-            Dialog::around(TextView::new(format!("{}", pid)))
-                .title("KIlling process")
-                .button("Close", |s| {
-                    s.pop_layer();
-                }),
-        );
+        let success = kill_process(pid);
+        if success {
+            s.add_layer(
+                Dialog::around(TextView::new(format!("Successfully killed process {}", pid)))
+                    .title("Success")
+                    .button("Close", |s| {
+                        s.pop_layer();
+                    }),
+            );
+        } else {
+            s.add_layer(
+                Dialog::around(TextView::new(format!("Failed to kill process {}", pid)))
+                    .title("Error")
+                    .button("Close", |s| {
+                        s.pop_layer();
+                    }),
+            );
+        }
     });
 
 

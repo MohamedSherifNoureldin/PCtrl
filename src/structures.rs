@@ -80,14 +80,14 @@ pub_struct! (SysStats {
 #[derive(Copy, Clone)]
 pub struct Config {
     pub record_length : u32,
-    pub update_freq : f32,
+    pub update_every : u32,
 }
 impl Config {
     pub fn start() -> Config {
         // reaf config file and assign to config
         Config {
             record_length: 10,
-            update_freq : 0.1,
+            update_every : 1,
         }
     }
 }

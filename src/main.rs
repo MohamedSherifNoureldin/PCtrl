@@ -93,8 +93,17 @@ impl TableViewItem<BasicColumn> for Process {
     }
 }
 
-// function to add data to the linked list
-fn log_data<T>(list: &mut LinkedList<T>, val:T, config: Config) { // all stat data entry should be through this function 
+
+// This function takes a linked list, a value, and a configuration object.
+// The linked list and configuration object are passed by mutable reference.
+// The linked list is used to store data. The configuration object is used to
+// determine how much data to store.
+//
+// If the linked list is at capacity, the oldest data point is removed. The
+// new value is then added to the front of the linked list.
+
+
+fn log_data<T>(list: &mut LinkedList<T>, val:T, config: Config) {
     if list.len() == config.record_length as usize {
         list.cursor_back_mut().remove_current();
     }
@@ -423,7 +432,7 @@ fn display_tui(columns_to_display: Vec<String>) {
             )
             .child(Dialog::around(table.with_name("table").full_screen()).title("Processes"))
             .child(Dialog::around(LinearLayout::horizontal()
-                .child(TextView::new("Press <q> to exit. Press <space> to pause/unpase real time update.\nPress <k> while selecting a process to kill it."))
+                .child(TextView::new("Press <q> to exit. Press <space> to pause/unpase real time update.\nPress <k> to kill selected process. Press <p>/<r> to pause/unpause selected process."))
                 .child(TextView::new("Status: Updating in realtime...").h_align(HAlign::Right).with_name("status").full_width()
             )).title("Controls"))
     );
@@ -455,6 +464,63 @@ fn display_tui(columns_to_display: Vec<String>) {
             );
         }
     });
+
+    // add a callback to pause process when user presses 'p' while selecting a row
+    siv.add_global_callback('p',   |s| {
+        let mut pid = 0;
+        s.call_on_name("table", |view: &mut TableView<Process, BasicColumn>| {
+            let selected_row: usize = view.item().unwrap() as usize;
+            let selected_item = view.borrow_item(selected_row).unwrap().clone();
+            pid = selected_item.pid;
+        });
+        let success = pause_process(pid);
+        if success {
+            s.add_layer(
+                Dialog::around(TextView::new(format!("Successfully paused process {}", pid)))
+                    .title("Success")
+                    .button("Close", |s| {
+                        s.pop_layer();
+                    }),
+            );
+        } else {
+            s.add_layer(
+                Dialog::around(TextView::new(format!("Failed to pause process {}", pid)))
+                    .title("Error")
+                    .button("Close", |s| {
+                        s.pop_layer();
+                    }),
+            );
+        }
+    });
+
+    // add a callback to resume process when user presses 'r' while selecting a row
+    siv.add_global_callback('r',   |s| {
+        let mut pid = 0;
+        s.call_on_name("table", |view: &mut TableView<Process, BasicColumn>| {
+            let selected_row: usize = view.item().unwrap() as usize;
+            let selected_item = view.borrow_item(selected_row).unwrap().clone();
+            pid = selected_item.pid;
+        });
+        let success = resume_process(pid);
+        if success {
+            s.add_layer(
+                Dialog::around(TextView::new(format!("Successfully resumed process {}", pid)))
+                    .title("Success")
+                    .button("Close", |s| {
+                        s.pop_layer();
+                    }),
+            );
+        } else {
+            s.add_layer(
+                Dialog::around(TextView::new(format!("Failed to resume process {}", pid)))
+                    .title("Error")
+                    .button("Close", |s| {
+                        s.pop_layer();
+                    }),
+            );
+        }
+    });
+
     siv.add_global_callback(cursive::event::Event::Refresh, move |s| {
         unsafe{update_views(s, &mut _processes, &mut _pid_table, &mut _sys_stats, *_config, counter);}
         counter += 1;
@@ -650,7 +716,27 @@ fn kill_process(pid: u32) -> bool {
         .arg("-9")
         .arg(pid.to_string())
         .output()
-        .expect("failed to execute process");
+        .expect("failed to kill process");
+
+    output.status.success()
+}
+
+fn pause_process(pid: u32) -> bool {
+    let output = std::process::Command::new("kill")
+        .arg("-STOP")
+        .arg(pid.to_string())
+        .output()
+        .expect("failed to pause process");
+
+    output.status.success()
+}
+
+fn resume_process(pid: u32) -> bool {
+    let output = std::process::Command::new("kill")
+        .arg("-CONT")
+        .arg(pid.to_string())
+        .output()
+        .expect("failed to resume process");
 
     output.status.success()
 }

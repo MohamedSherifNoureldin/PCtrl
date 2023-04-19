@@ -712,6 +712,7 @@ fn main() {
                 .value_delimiter(',')
                 .value_parser(clap::value_parser!(u32))
                 .required(true)
+                .action(ArgAction::Append)
             )
             .arg(
                 clap::Arg::new("output_file")

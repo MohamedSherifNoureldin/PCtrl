@@ -15,7 +15,7 @@ use procfs::{ticks_per_second, Meminfo}; // proc reading library
 // cursive TUI imports
 use cursive::Cursive;
 use cursive::theme::{Color, PaletteColor, Theme, BorderStyle};
-use cursive::views::{Dialog, TextView, LinearLayout};
+use cursive::views::{Dialog, TextView, LinearLayout, EditView, DummyView, SelectView};
 use cursive_table_view::{TableView, TableViewItem };
 use cursive::CursiveExt;
 use cursive::align::HAlign;
@@ -96,7 +96,6 @@ fn log_data<T>(list: &mut LinkedList<T>, val:T, config: Config) {
     }
     list.push_front(val);
 }
-
 
 // function to read system wide processes along with system wide data and update the data structures
 fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys_stats: &mut SysStats, config: Config) {
@@ -322,21 +321,6 @@ fn display_tui(columns_to_display: Vec<String>) {
     });
 
     let mut table = TableView::<Process, BasicColumn>::new();
-        // .column(BasicColumn::PID, "PID", |c| {
-        //     c.ordering(Ordering::Less)
-        //     .align(HAlign::Right)
-        //     .width(6)
-        // })
-        // .column(BasicColumn::PPID, "PPID", |c| c.align(HAlign::Right).width(8))
-        // .column(BasicColumn::PRIORITY, "PRI", |c| c.align(HAlign::Right).width(6))
-        // .column(BasicColumn::CPU, "CPU %", |c| c.align(HAlign::Right).width(9))
-        // .column(BasicColumn::MEM, "MEM %", |c| c.align(HAlign::Right).width(9))
-        // .column(BasicColumn::STATE, "STATE", |c| c.align(HAlign::Right).width(9))
-        // .column(BasicColumn::STARTTIME, "STARTTIME", |c| c.align(HAlign::Right).width(17))
-        // .column(BasicColumn::FD, "FD", |c| c.align(HAlign::Right).width(6))
-        // .column(BasicColumn::OWNER, "OWNER", |c| c.align(HAlign::Right).width(20))
-        // .column(BasicColumn::CMD, "CMD", |c| c.align(HAlign::Right));
-
     for col_name in columns_to_display {
             match col_name.as_str() {
                 "PID" => table = table.column(BasicColumn::PID, "PID", |c| {
@@ -356,7 +340,8 @@ fn display_tui(columns_to_display: Vec<String>) {
                 _ => { println!("Invalid column name: {}", col_name); }
             }
         }
-    unsafe{ table.set_items(processes_to_display.clone()); }
+    
+    table.set_items(processes_to_display.clone());
 
     // Detect clicks on column headers
     table.set_on_sort(|siv: &mut Cursive, column: BasicColumn, order: Ordering| {        
@@ -368,7 +353,6 @@ fn display_tui(columns_to_display: Vec<String>) {
                 }),
         );
     });
-
 
     siv.add_layer(
         LinearLayout::vertical()
@@ -395,7 +379,7 @@ fn display_tui(columns_to_display: Vec<String>) {
             )
             .child(Dialog::around(table.with_name("table").full_screen()).title("Processes"))
             .child(Dialog::around(LinearLayout::horizontal()
-                .child(TextView::new("Press <q> to exit. Press <space> to pause/unpase real time update.\nPress <k> to kill selected process. Press <p>/<r> to pause/unpause selected process."))
+                .child(TextView::new("Press <q> to exit. Press <space> to pause/unpase real time update.\nPress <k> to kill selected process. Press <p>/<r> to pause/unpause selected process.\nPress <s>/<ctrl+f> to search for a certain process by PID or CMD. Press <c> to clear all filters and searches."))
                 .child(TextView::new("Status: Updating in realtime...").h_align(HAlign::Right).with_name("status").full_width()
             )).title("Controls"))
     );
@@ -492,6 +476,114 @@ fn display_tui(columns_to_display: Vec<String>) {
     });
     siv.set_autorefresh(true);
     siv.set_fps(unsafe{_CONFIG.update_every});
+
+    siv.add_global_callback(cursive::event::Event::CtrlChar('f'), |siv|{
+        siv.add_layer(
+            Dialog::around(
+                LinearLayout::vertical()
+                    .child(
+                        LinearLayout::horizontal()
+                            .child(TextView::new("Search Column: ").h_align(HAlign::Left).with_name("search_column").full_width())
+                            .child(DummyView)
+                            .child(DummyView)
+                            .child(TextView::new("Search Value: ").h_align(HAlign::Left).with_name("search_term").full_width())
+                    )
+                    .child(
+                        LinearLayout::horizontal()
+                            .child(SelectView::new().item_str("PID").item_str("CMD").popup().with_name("column_input").full_width())
+                            .child(DummyView)
+                            .child(DummyView)
+                            .child(EditView::new().with_name("search_term_input").full_width())
+                    )
+            )
+            .title("Search for a process")
+            .button("Ok", |s: &mut Cursive| {
+                let search_term = s.call_on_name("search_term_input", |view: &mut EditView| {
+                    view.get_content()
+                }).unwrap();
+                let search_column = s.call_on_name("column_input", |view: &mut SelectView| {
+                    view.add_item_str("Found");
+                    view.selected_id().unwrap()
+                }).unwrap();
+                let mut search_column_str = "";
+                if search_column == 0 {
+                    search_column_str = "PID";
+                } else if search_column == 1 {
+                    search_column_str = "CMD";
+                }
+                unsafe{
+                    _FILTERS.clear();
+                    _FILTERS.push(
+                        FilterItem{
+                            column: search_column_str.to_string(), 
+                            value: search_term.to_string(),
+                            filter_type: "eq".to_string(),
+                        }
+                    );
+                }
+                s.pop_layer();
+            })
+        );
+    });
+
+    siv.add_global_callback('s', |siv|{
+        siv.add_layer(
+            Dialog::around(
+                LinearLayout::vertical()
+                    .child(
+                        LinearLayout::horizontal()
+                            .child(TextView::new("Search Column: ").h_align(HAlign::Left).with_name("search_column").full_width())
+                            .child(DummyView)
+                            .child(DummyView)
+                            .child(TextView::new("Search Value: ").h_align(HAlign::Left).with_name("search_term").full_width())
+                    )
+                    .child(
+                        LinearLayout::horizontal()
+                            .child(SelectView::new().item_str("PID").item_str("CMD").popup().with_name("column_input").full_width())
+                            .child(DummyView)
+                            .child(DummyView)
+                            .child(EditView::new().with_name("search_term_input").full_width())
+                    )
+            )
+            .title("Search for a process")
+            .button("Ok", |s: &mut Cursive| {
+                let search_term = s.call_on_name("search_term_input", |view: &mut EditView| {
+                    view.get_content()
+                }).unwrap();
+                let search_column = s.call_on_name("column_input", |view: &mut SelectView| {
+                    view.add_item_str("Found");
+                    view.selected_id().unwrap()
+                }).unwrap();
+                let mut search_column_str = "";
+                if search_column == 0 {
+                    search_column_str = "PID";
+                } else if search_column == 1 {
+                    search_column_str = "CMD";
+                }
+                unsafe{
+                    _FILTERS.clear();
+                    _FILTERS.push(
+                        FilterItem{
+                            column: search_column_str.to_string(), 
+                            value: search_term.to_string(),
+                            filter_type: "eq".to_string(),
+                        }
+                    );
+                }
+                s.pop_layer();
+            })
+        );
+    });
+
+    siv.add_global_callback('c', |siv|{
+        siv.add_layer(Dialog::text("Clearing filters").title("Clearing filters").button("Ok", |s| {
+            s.pop_layer();
+        }));
+        unsafe{
+            _FILTERS.clear();
+        }
+    });
+
     siv.run();
 }
 
@@ -549,7 +641,6 @@ fn custom_theme_from_cursive(siv: &Cursive) -> Theme {
 
     theme
 }
-
 
 // main structures
 static mut _PROCESSES : Lazy<Vec<Process>> = Lazy::new(|| Vec::new()); 
@@ -684,37 +775,6 @@ fn main() {
         _ => unsafe{_FILTERS.clear()},
     }
 
-    // // let filter_columns: Vec<String> = matches.subcommand_matches("filter").unwrap_or(Vec::new()).get_many::<String>("target_column").unwrap().map(|s| s.to_string()).collect();
-    // let filter_columns: Vec<String> = matches.subcommand_matches("filter")
-    //     .and_then(|subcommand| subcommand.get_many::<String>("target_column"))
-    //     .map(|columns| columns.map(|s| s.to_string()).collect())
-    //     .unwrap_or(vec![]);
-    // let filter_types: Vec<String> = matches.subcommand_matches("filter")
-    //     .and_then(|subcommand| subcommand.get_many::<String>("filter_type"))
-    //     .map(|columns| columns.map(|s| s.to_string()).collect())
-    //     .unwrap_or(vec![]);
-    // let filter_values: Vec<String> = matches.subcommand_matches("filter")
-    //     .and_then(|subcommand| subcommand.get_many::<String>("filter_value"))
-    //     .map(|columns| columns.map(|s| s.to_string()).collect())
-    //     .unwrap_or(vec![]);
-    
-    // if filter_columns.len() != filter_types.len() || filter_columns.len() != filter_values.len() || filter_types.len() != filter_values.len() {
-    //     println!("Error: Number of columns to filter on, number of filter types and number of filter values are not equal");
-    //     std::process::exit(1);
-    // }
-    // unsafe{
-    //     _FILTERS.clear();
-    //     for i in 0..filter_columns.len() {
-    //         _FILTERS.push(
-    //             FilterItem{
-    //                 column: filter_columns[i].clone(), 
-    //                 value: filter_values[i].clone(),
-    //                 filter_type: filter_types[i].clone(),
-    //             }
-    //         );
-    //     }
-    // }
-
     display_tui(columns_to_display);
     unsafe
     {
@@ -729,7 +789,6 @@ fn main() {
     }
 }
  
-
 fn record_prc(procs: &mut Vec<Process>, pid_table: &mut HashMap<u32, u16>, pid: u32, recording_procs: Vec<u32>, config: &mut Config) { // recordings exist in "/usr/local/pctrl/", process record format is plog
     let home = dirs::home_dir().unwrap().into_os_string().into_string().unwrap();
     let file_name = format!("{}/.local/share/pctrl/pctrl_{}.plog", home, pid);    
@@ -821,8 +880,7 @@ fn resume_process(pid: u32) -> bool {
     output.status.success()
 }
 
-fn filter_process(procs: &mut Vec<Process>) -> Vec<Process>
-{
+fn filter_process(procs: &mut Vec<Process>) -> Vec<Process> {
     let mut filtered_procs: Vec<Process> = procs.clone();
     unsafe{
         // read filters one by one from the _FILTERS vector

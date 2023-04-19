@@ -10,7 +10,7 @@ use std::io::Write;
 use once_cell::sync::Lazy;
 
 use std::num::NonZeroU32;
-//use chrono::{DateTime, Local};
+use chrono::{DateTime, Local, Utc};
 
 use users::{get_user_by_uid, get_group_by_gid, Group}; // library for linux users
 use procfs::{ticks_per_second, Meminfo}; // proc reading library
@@ -103,13 +103,11 @@ fn log_data<T>(list: &mut LinkedList<T>, val:T, config: Config) { // all stat da
 
 
 
-
 // function to read system wide processes along with system wide data and update the data structures
 fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys_stats: &mut SysStats, config: Config) {
     let mut child_queue: Vec<(u32, u32)> = Vec::new(); // ppid, pid
     let mut total_net = 0;
     let mut proc_count = 0;
-
     let mut cpu_count: u8 = 0;
     let mut cpus_usage :Vec<f32> = Vec::new();
     let mut cpu_total = 0;
@@ -147,7 +145,6 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
             }
         }
         last_read = stat.pid as u32;
-
         proc_count += 1;
         let i: usize;
         if pid_table.contains_key(&(stat.pid as u32)) {
@@ -168,7 +165,6 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
             procs.push(newproc);
         }
         if i >= procs.len() { continue }
-        //let prev_duration = ((procs[i].run_duration as i64 * tps as i64)  - ((stat.cutime + stat.cstime) as i64 + stat.guest_time.unwrap() as i64));
         
         // Read Proc data
         procs[i].state.procstate = stat.state().unwrap();
@@ -188,7 +184,6 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
         procs[i].pid = stat.pid as u32;
         procs[i].parent_pid = stat.ppid as u32;
         procs[i].priority = stat.priority as u8;
-        //procs[i].run_duration = ((stat.utime + stat.stime + stat.cutime as u64 + stat.cstime as u64 + stat.guest_time.unwrap_or_default()) / tps) as u32;  
         procs[i].start_time = stat.starttime().unwrap();
         procs[i].dir = prc.exe().unwrap_or_default();
         procs[i].owner = get_user_by_uid(prc.uid().unwrap()).unwrap().name().to_str().unwrap().to_string();
@@ -226,7 +221,6 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
         };
         log_data(&mut procs[i].swap_hist, (stat.nswap /256) as u16, config); //swap in mb
         
-        
         let mut netsum:u32 = 0;
         let _devstatus = match prc.dev_status() {
             Err(_e) => {},
@@ -237,10 +231,7 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
                 }
             }
         };
-    
-        
         log_data(&mut procs[i].net_hist, netsum, config); //network usage in kb
-
         procs[i]._prev_duration = stat.utime+stat.stime;
     }
     for i in (last_read+1)..(procs[procs.len() -1].pid+1 as u32) { // check if latest procs have ended
@@ -264,10 +255,6 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
     let meminfo = Meminfo::new().unwrap();
     sys_stats.mem_total = (meminfo.mem_total as u64 / (1024*1024) as u64) as u32;
     log_data(&mut sys_stats.cpu_hist, cpus_usage, config);
-    // if sys_stats.disk_hist.len() > 2 {
-    //     println!("systemcpu: {}", 0.5 * (cpus_usage[0] + cpus_usage[1]) );
-    // }
-    //usedMem -= buffersMem + cachedMem;
     log_data(&mut sys_stats.ram_hist ,sys_stats.mem_total -  ((meminfo.mem_free) / (1024*1024)) as u32, config);
     let mut sum = 0;
     for d in procfs::diskstats().unwrap() {
@@ -279,7 +266,6 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
     sys_stats.cpu_cores_num = cpu_count;
     sys_stats.user_proc_count = proc_count;
     
-
     let freq = read_to_string("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq").unwrap_or_default();
     let temp = read_to_string("/sys/class/thermal/thermal_zone0/temp").unwrap_or_default();
 
@@ -604,7 +590,7 @@ fn record_prc(procs: &mut Vec<Process>, pid_table: &mut HashMap<u32, u16>, pid: 
     while recording_procs.contains(&pid) && unsafe{!PAUSE_REC} {
         unsafe{update_procs(&mut _pid_table, &mut _processes, &mut _sys_stats, *_config);} //REMOVE
         if !pid_table.contains_key(&pid) {
-            println!("-stopped-");
+            println!("-Process Exited-");
             return
         }
         let prc = Some(&procs[pid_table[&pid] as usize]);
@@ -612,12 +598,13 @@ fn record_prc(procs: &mut Vec<Process>, pid_table: &mut HashMap<u32, u16>, pid: 
             Some(&ref p) => {
                 let def32:u32 =0;
                 let def16:u16 = 0;
-                println!("{}", format!("{} {} {:?} {} {} {} {} {}", p.name, p.owner, 
+                let timestamp: DateTime<Utc> = DateTime::from_utc(Local::now().naive_utc(), Utc);
+                /*println!("{}", format!("{} {} {:?} {} {} {} {} {} {}", p.name, p.owner, 
                 p.state.procstate, p.cpu_hist.front().unwrap(), p.ram_hist.front().unwrap_or(&def32), 
-                p.disk_hist.front().unwrap_or(&def32), p.net_hist.front().unwrap_or(&def32), p.swap_hist.front().unwrap_or(&def16)));
-                //writeln!(&file, "{}", format!("{} {} {:?} {} {} {} {} {}", p.name, p.owner, 
-                //p.state.procstate, p.cpu_hist.front().unwrap(), p.ram_hist.front().unwrap(), 
-                //p.disk_hist.front().unwrap(), p.net_hist.front().unwrap(), p.swap_hist.front().unwrap()));
+                p.disk_hist.front().unwrap_or(&def32), p.net_hist.front().unwrap_or(&def32), p.swap_hist.front().unwrap_or(&def16), timestamp.format("%d/%m/%Y %H:%M:%S")));*/
+                writeln!(&file, "{}", format!("{} {} {:?} {} {} {} {} {} {}", p.name, p.owner, 
+                p.state.procstate, p.cpu_hist.front().unwrap(), p.ram_hist.front().unwrap_or(&def32), 
+                p.disk_hist.front().unwrap_or(&def32), p.net_hist.front().unwrap_or(&def32), p.swap_hist.front().unwrap_or(&def16), timestamp.format("%d/%m/%Y %H:%M:%S")));
                 stopped = false
             }, // writing using the macro 'writeln!'
     
@@ -631,7 +618,7 @@ fn record_prc(procs: &mut Vec<Process>, pid_table: &mut HashMap<u32, u16>, pid: 
             counter += 1;
             if counter > config.record_length {
                 // remove from beginning of file
-                //file.seek(SeekFrom::Start(0)).unwrap();
+                file.seek(SeekFrom::Start(0)).unwrap();
                 counter = 0;
             }
         }

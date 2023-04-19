@@ -618,40 +618,102 @@ fn main() {
                 .required(true)
             )
         )
+        .subcommand(
+            Command::new("search")
+            .about("Search for a certian process using NAME or PID")
+            .arg(
+                clap::Arg::new("search_column")
+                .short('c')
+                .long("column")
+                .value_name("COLUMN_TO_SEARCH_ON")
+                .help("Column to be searched on")
+                .value_parser(["PID", "CMD"])
+                .default_value("PID")
+                .required(true)
+            )
+            .arg(
+                clap::Arg::new("search_value")
+                .short('v')
+                .long("value")
+                .value_name("SEARCH_VALUE")
+                .help("Search value to be used to search for a process")
+                .required(true)
+            )
+        )
         .get_matches();
     
     let columns_to_display: Vec<String> = matches.get_many::<String>("columns").unwrap().map(|s| s.trim().to_string().to_uppercase()).collect();
 
-    // let filter_columns: Vec<String> = matches.subcommand_matches("filter").unwrap_or(Vec::new()).get_many::<String>("target_column").unwrap().map(|s| s.to_string()).collect();
-    let filter_columns: Vec<String> = matches.subcommand_matches("filter")
-        .and_then(|subcommand| subcommand.get_many::<String>("target_column"))
-        .map(|columns| columns.map(|s| s.to_string()).collect())
-        .unwrap_or(vec![]);
-    let filter_types: Vec<String> = matches.subcommand_matches("filter")
-        .and_then(|subcommand| subcommand.get_many::<String>("filter_type"))
-        .map(|columns| columns.map(|s| s.to_string()).collect())
-        .unwrap_or(vec![]);
-    let filter_values: Vec<String> = matches.subcommand_matches("filter")
-        .and_then(|subcommand| subcommand.get_many::<String>("filter_value"))
-        .map(|columns| columns.map(|s| s.to_string()).collect())
-        .unwrap_or(vec![]);
-    
-    if filter_columns.len() != filter_types.len() || filter_columns.len() != filter_values.len() || filter_types.len() != filter_values.len() {
-        println!("Error: Number of columns to filter on, number of filter types and number of filter values are not equal");
-        std::process::exit(1);
-    }
-    unsafe{
-        _FILTERS.clear();
-        for i in 0..filter_columns.len() {
-            _FILTERS.push(
-                FilterItem{
-                    column: filter_columns[i].clone(), 
-                    value: filter_values[i].clone(),
-                    filter_type: filter_types[i].clone(),
+    // parse commands arguments
+    match matches.subcommand() {
+        Some(("filter", sub_matches)) => {
+            let filter_columns: Vec<String> = sub_matches.get_many::<String>("target_column").unwrap().map(|s| s.trim().to_string().to_uppercase()).collect();
+            let filter_types: Vec<String> = sub_matches.get_many::<String>("filter_type").unwrap().map(|s| s.trim().to_string()).collect();
+            let filter_values: Vec<String> = sub_matches.get_many::<String>("filter_value").unwrap().map(|s| s.trim().to_string().to_uppercase()).collect();
+            if filter_columns.len() != filter_types.len() || filter_columns.len() != filter_values.len() || filter_types.len() != filter_values.len() {
+                println!("Error: Number of columns to filter on, number of filter types and number of filter values are not equal");
+                std::process::exit(1);
+            }
+            unsafe{
+                _FILTERS.clear();
+                for i in 0..filter_columns.len() {
+                    _FILTERS.push(
+                        FilterItem{
+                            column: filter_columns[i].clone(), 
+                            value: filter_values[i].clone(),
+                            filter_type: filter_types[i].clone(),
+                        }
+                    );
                 }
-            );
-        }
+            }
+        },
+        Some(("search", sub_matches)) => {
+            let search_column: String = sub_matches.get_one::<String>("search_column").unwrap().trim().to_string().to_uppercase();
+            let search_term: String = sub_matches.get_one::<String>("search_value").unwrap().trim().to_string().to_uppercase();
+            unsafe{
+                _FILTERS.clear();
+                _FILTERS.push(
+                    FilterItem{
+                        column: search_column.clone(), 
+                        value: search_term.clone(),
+                        filter_type: "eq".to_string(),
+                    }
+                );
+            }
+        },
+        _ => unsafe{_FILTERS.clear()},
     }
+
+    // // let filter_columns: Vec<String> = matches.subcommand_matches("filter").unwrap_or(Vec::new()).get_many::<String>("target_column").unwrap().map(|s| s.to_string()).collect();
+    // let filter_columns: Vec<String> = matches.subcommand_matches("filter")
+    //     .and_then(|subcommand| subcommand.get_many::<String>("target_column"))
+    //     .map(|columns| columns.map(|s| s.to_string()).collect())
+    //     .unwrap_or(vec![]);
+    // let filter_types: Vec<String> = matches.subcommand_matches("filter")
+    //     .and_then(|subcommand| subcommand.get_many::<String>("filter_type"))
+    //     .map(|columns| columns.map(|s| s.to_string()).collect())
+    //     .unwrap_or(vec![]);
+    // let filter_values: Vec<String> = matches.subcommand_matches("filter")
+    //     .and_then(|subcommand| subcommand.get_many::<String>("filter_value"))
+    //     .map(|columns| columns.map(|s| s.to_string()).collect())
+    //     .unwrap_or(vec![]);
+    
+    // if filter_columns.len() != filter_types.len() || filter_columns.len() != filter_values.len() || filter_types.len() != filter_values.len() {
+    //     println!("Error: Number of columns to filter on, number of filter types and number of filter values are not equal");
+    //     std::process::exit(1);
+    // }
+    // unsafe{
+    //     _FILTERS.clear();
+    //     for i in 0..filter_columns.len() {
+    //         _FILTERS.push(
+    //             FilterItem{
+    //                 column: filter_columns[i].clone(), 
+    //                 value: filter_values[i].clone(),
+    //                 filter_type: filter_types[i].clone(),
+    //             }
+    //         );
+    //     }
+    // }
 
     display_tui(columns_to_display);
     unsafe
@@ -761,7 +823,7 @@ fn resume_process(pid: u32) -> bool {
 
 fn filter_process(procs: &mut Vec<Process>) -> Vec<Process>
 {
-    let mut filtered_procs: Vec<Process> = Vec::new();
+    let mut filtered_procs: Vec<Process> = procs.clone();
     unsafe{
         // read filters one by one from the _FILTERS vector
         for filter in _FILTERS.iter() {

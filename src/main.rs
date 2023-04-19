@@ -97,6 +97,7 @@ fn log_data<T>(list: &mut LinkedList<T>, val:T, config: Config) {
     list.push_front(val);
 }
 
+
 // function to read system wide processes along with system wide data and update the data structures
 fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys_stats: &mut SysStats, config: Config) {
     let mut child_queue: Vec<(u32, u32)> = Vec::new(); // ppid, pid
@@ -331,6 +332,21 @@ fn display_tui(columns_to_display: Vec<String>) {
     });
 
     let mut table = TableView::<Process, BasicColumn>::new();
+        // .column(BasicColumn::PID, "PID", |c| {
+        //     c.ordering(Ordering::Less)
+        //     .align(HAlign::Right)
+        //     .width(6)
+        // })
+        // .column(BasicColumn::PPID, "PPID", |c| c.align(HAlign::Right).width(8))
+        // .column(BasicColumn::PRIORITY, "PRI", |c| c.align(HAlign::Right).width(6))
+        // .column(BasicColumn::CPU, "CPU %", |c| c.align(HAlign::Right).width(9))
+        // .column(BasicColumn::MEM, "MEM %", |c| c.align(HAlign::Right).width(9))
+        // .column(BasicColumn::STATE, "STATE", |c| c.align(HAlign::Right).width(9))
+        // .column(BasicColumn::STARTTIME, "STARTTIME", |c| c.align(HAlign::Right).width(17))
+        // .column(BasicColumn::FD, "FD", |c| c.align(HAlign::Right).width(6))
+        // .column(BasicColumn::OWNER, "OWNER", |c| c.align(HAlign::Right).width(20))
+        // .column(BasicColumn::CMD, "CMD", |c| c.align(HAlign::Right));
+
     for col_name in columns_to_display {
             match col_name.as_str() {
                 "PID" => table = table.column(BasicColumn::PID, "PID", |c| {
@@ -350,8 +366,7 @@ fn display_tui(columns_to_display: Vec<String>) {
                 _ => { println!("Invalid column name: {}", col_name); }
             }
         }
-    
-    table.set_items(processes_to_display.clone());
+        table.set_items(processes_to_display.clone());
 
     // Detect clicks on column headers
     table.set_on_sort(|siv: &mut Cursive, column: BasicColumn, order: Ordering| {        
@@ -363,6 +378,7 @@ fn display_tui(columns_to_display: Vec<String>) {
                 }),
         );
     });
+
 
     siv.add_layer(
         LinearLayout::vertical()
@@ -389,8 +405,8 @@ fn display_tui(columns_to_display: Vec<String>) {
             )
             .child(Dialog::around(table.with_name("table").full_screen()).title("Processes"))
             .child(Dialog::around(LinearLayout::horizontal()
-                .child(TextView::new("Press <q> to exit. Press <space> to pause/unpase real time update.\nPress <k> to kill selected process. Press <p>/<r> to pause/unpause selected process.\nPress <s>/<ctrl+f> to search for a certain process by PID or CMD. Press <c> to clear all filters and searches."))
-                .child(TextView::new("Status: Updating in realtime...").h_align(HAlign::Right).with_name("status").full_width()
+            .child(TextView::new("Press <q> to exit. Press <space> to pause/unpase real time update.\nPress <k> to kill selected process. Press <p>/<r> to pause/unpause selected process.\nPress <s>/<ctrl+f> to search for a certain process by PID or CMD. Press <c> to clear all filters and searches."))
+            .child(TextView::new("Status: Updating in realtime...").h_align(HAlign::Right).with_name("status").full_width()
             )).title("Controls"))
     );
 
@@ -535,7 +551,6 @@ fn display_tui(columns_to_display: Vec<String>) {
             })
         );
     });
-
     siv.add_global_callback('s', |siv|{
         siv.add_layer(
             Dialog::around(
@@ -584,7 +599,6 @@ fn display_tui(columns_to_display: Vec<String>) {
             })
         );
     });
-
     siv.add_global_callback('c', |siv|{
         siv.add_layer(Dialog::text("Clearing filters").title("Clearing filters").button("Ok", |s| {
             s.pop_layer();
@@ -651,6 +665,7 @@ fn custom_theme_from_cursive(siv: &Cursive) -> Theme {
 
     theme
 }
+
 
 // main structures
 static mut _PROCESSES : Lazy<Vec<Process>> = Lazy::new(|| Vec::new()); 
@@ -816,20 +831,25 @@ fn main() {
     //     }
     // }
 
+    // if record argument is made {
+        let recording_procs: Vec<u32> = matches.get_many::<u32>("record").expect("`pid`is required").copied().collect();
+        unsafe{ // for testing
+            if recording_procs[0] != 0 {
+                record_prc(&mut _PROCESSES, &mut _PID_TABLE, recording_procs[0], recording_procs, &mut _CONFIG);
+            }
+            return
+        }
+    // }
     display_tui(columns_to_display);
     unsafe
     {
         filter_process(&mut _PROCESSES);
     }
 
-    let recording_procs: Vec<u32> = matches.get_many::<u32>("record").expect("`pid`is required").copied().collect();
-    unsafe{ // for testing
-        if recording_procs[0] != 0 {
-            record_prc(&mut _PROCESSES, &mut _PID_TABLE, recording_procs[0], recording_procs, &mut _CONFIG);
-        }
-    }
+    
 }
  
+
 fn record_prc(procs: &mut Vec<Process>, pid_table: &mut HashMap<u32, u16>, pid: u32, recording_procs: Vec<u32>, config: &mut Config) { // recordings exist in "/usr/local/pctrl/", process record format is plog
     let home = dirs::home_dir().unwrap().into_os_string().into_string().unwrap();
     let file_name = format!("{}/.local/share/pctrl/pctrl_{}.plog", home, pid);    
@@ -928,7 +948,8 @@ fn resume_process(pid: u32) -> bool {
     output.status.success()
 }
 
-fn filter_process(procs: &mut Vec<Process>) -> Vec<Process> {
+fn filter_process(procs: &mut Vec<Process>) -> Vec<Process>
+{
     let mut filtered_procs: Vec<Process> = procs.clone();
     unsafe{
         // read filters one by one from the _FILTERS vector

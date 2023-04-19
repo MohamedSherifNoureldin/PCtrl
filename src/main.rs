@@ -690,16 +690,37 @@ fn main() {
                 .value_parser(["PID", "PPID", "PRI", "CPU", "MEM", "STATE", "STARTTIME", "FD", "OWNER", "CMD"])
                 .action(ArgAction::Append),
         )
-        .arg(
-            clap::Arg::new("record")
-            .long("record")
-            //.takes_value(true)
-            .value_parser(clap::value_parser!(u32))
-            .value_delimiter(',')
-            .value_name("rec_pids")
-            .help("Comma-separated list of PIDs to record.")
-            .default_value("0")
-            .action(ArgAction::Append),
+        // .arg(
+        //     clap::Arg::new("record")
+        //     .long("record")
+        //     //.takes_value(true)
+        //     .value_parser(clap::value_parser!(u32))
+        //     .value_delimiter(',')
+        //     .value_name("rec_pids")
+        //     .help("Comma-separated list of PIDs to record.")
+        //     .action(ArgAction::Append),
+        // )
+        .subcommand(
+            Command::new("record")
+            .about("Record information about certain processes in a file")
+            .arg(
+                clap::Arg::new("record_pids")
+                .short('p')
+                .long("pids")
+                .value_name("PIDS_TO_RECORD")
+                .help("Comma-separated list of PIDs to record")
+                .value_delimiter(',')
+                .value_parser(clap::value_parser!(u32))
+                .required(true)
+            )
+            .arg(
+                clap::Arg::new("output_file")
+                .short('o')
+                .long("output_file")
+                .value_name("FILE_TO_RECORD_IN")
+                .help("File to record in")
+                .required(true)
+            )
         )
         .subcommand(
             Command::new("filter")
@@ -759,7 +780,7 @@ fn main() {
         .get_matches();
     
     let columns_to_display: Vec<String> = matches.get_many::<String>("columns").unwrap().map(|s| s.trim().to_string().to_uppercase()).collect();
-
+    let mut record_mode = false;
     // parse commands arguments
     match matches.subcommand() {
         Some(("filter", sub_matches)) => {
@@ -797,6 +818,13 @@ fn main() {
                 );
             }
         },
+        Some(("record", sub_matches)) => {
+            let recording_procs: Vec<u32> = sub_matches.get_many::<u32>("record_pids").unwrap().cloned().collect();
+            unsafe{ // for testing
+                    record_prc(&mut _PROCESSES, &mut _PID_TABLE, recording_procs[0], recording_procs, &mut _CONFIG);
+                    record_mode = true;
+            }
+        },
         _ => unsafe{_FILTERS.clear()},
     }
 
@@ -832,20 +860,14 @@ fn main() {
     // }
 
     // if record argument is made {
-        let recording_procs: Vec<u32> = matches.get_many::<u32>("record").expect("`pid`is required").copied().collect();
-        unsafe{ // for testing
-            if recording_procs[0] != 0 {
-                record_prc(&mut _PROCESSES, &mut _PID_TABLE, recording_procs[0], recording_procs, &mut _CONFIG);
-            }
-            return
-        }
     // }
-    display_tui(columns_to_display);
-    unsafe
-    {
-        filter_process(&mut _PROCESSES);
+    if !record_mode {
+        display_tui(columns_to_display);
+        unsafe
+        {
+            filter_process(&mut _PROCESSES);
+        }
     }
-
     
 }
  

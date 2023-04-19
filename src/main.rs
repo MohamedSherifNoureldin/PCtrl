@@ -1,11 +1,9 @@
 #![feature(linked_list_cursors)]
 use std::collections::LinkedList;
-use std::os::unix::raw::pid_t;
 use std::vec::Vec;
 use std::collections::HashMap;
 use std::path::{Path};
-use std::fs::{read_to_string, File}; // use unsafe with static muts for static lifetime of main structures
-use std::io::Write;
+use std::fs::read_to_string; // use unsafe with static muts for static lifetime of main structures
 
 use once_cell::sync::Lazy;
 
@@ -27,11 +25,11 @@ use std::cmp::Ordering;
 extern crate cursive_table_view;
 extern crate dirs;
 
-use std::fs::OpenOptions;
-use std::io::{Seek, SeekFrom};
 use std::{thread, time::Duration};
 use std::fs::create_dir;
-use clap::{Command, Arg, ArgAction};
+use clap::{Command, ArgAction};
+
+use chrono::DateTime;
 
 pub mod structures;
 use structures::*;
@@ -93,14 +91,12 @@ impl TableViewItem<BasicColumn> for Process {
     }
 }
 
-// function to add data to the linked list
-fn log_data<T>(list: &mut LinkedList<T>, val:T, config: Config) { // all stat data entry should be through this function 
+fn log_data<T>(list: &mut LinkedList<T>, val:T, config: Config) {
     if list.len() == config.record_length as usize {
         list.cursor_back_mut().remove_current();
     }
     list.push_front(val);
 }
-
 
 
 // function to read system wide processes along with system wide data and update the data structures
@@ -117,7 +113,7 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
     	if sys_stats.cpu_hist.len() > 0 {
         }
         cpu_total = cpu.user + cpu.nice + cpu.system + cpu.idle + cpu.iowait.unwrap_or(0) + cpu.irq.unwrap_or(0) + cpu.softirq.unwrap_or(0) + cpu.steal.unwrap_or(0);// + cpu.guest.unwrap_or(0) + cpu.guest_nice.unwrap_or(0);
-        //100.0 * ((stat.utime+stat.stime) - prev_duration) as f32 / (cpu_total - sys_stats._cpu_total) as f32 * cpu_count as f32
+        //100.0 * ((stat.utime+stat.stime) - _prev_duration) as f32 / (cpu_total - sys_stats._cpu_total) as f32 * cpu_count as f32
         let idle = cpu.idle + cpu.iowait.unwrap_or(0);
         let totald = cpu_total as f64 - sys_stats._cpu_total as f64;
         let idled = idle as f64 - sys_stats._idle as f64;
@@ -203,13 +199,13 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
             }
         }
         
-        let prev_duration = procs[i]._prev_duration;
+        let _prev_duration = procs[i]._prev_duration;
         let _statm =  match prc.statm() {
             Ok(statm) => { log_data(&mut procs[i].ram_hist, (stat.rss_bytes() / (1000*1000)) as u32, config); // size in mb 
             },
             Err(_e) => {},
         };
-        //log_data(&mut procs[i].cpu_hist, 100.0 * ((stat.utime+stat.stime) - prev_duration) as f32 / ((cpu_total - sys_stats._cpu_total) as f32 / cpu_count as f32) as f32, config); // cpu percent time utilization
+        //log_data(&mut procs[i].cpu_hist, 100.0 * ((stat.utime+stat.stime) - _prev_duration) as f32 / ((cpu_total - sys_stats._cpu_total) as f32 / cpu_count as f32) as f32, config); // cpu percent time utilization
         //log_data(&mut procs[i].cpu_hist, ((cpu_total - sys_stats._cpu_total) - ()) as f32 / (cpu_total - sys_stats._cpu_total) as f32 * 100.0, config); // cpu percent time utilization
         
         log_data(&mut procs[i].cpu_hist, ((stat.utime+stat.stime)/ticks_per_second()) as f32  / (uptime as f32 - (stat.starttime/ticks_per_second()) as f32) as f32, config); // cpu percent time utilization
@@ -285,32 +281,12 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
 fn display_tui(columns_to_display: Vec<String>) {
     let mut counter: u32 = 0;
 
-    // let mut pid_table: HashMap<u32, u16> = HashMap::new();
-    // let mut procs: Vec<Process> = Vec::new();
-    // let mut sys_stats: SysStats = SysStats {
-    //     cpu_name: String::new(),
-    //     cpu_freq: 0,
-    //     cpu_temp: 0,
-    //     cpu_cores_num: 0,
-    //     uptime: 0.0,
-    //     mem_total: 0,
-    //     user_proc_count: 0,
-    //     cpu_hist: LinkedList::new(),
-    //     ram_hist: LinkedList::new(),
-    //     disk_hist: LinkedList::new(),
-    //     net_hist: LinkedList::new(),
-    //     swap_hist: LinkedList::new(),
-    //     _cpu_total:0,
-    //     _idle:0,
-    // };
-    // let config = Config { record_length: 5, update_every: 1.0 };
-    // let mut pid_table = unsafe{_pid_table};
-    // let mut procs = unsafe{_processes};
-    // let mut sys_stats = unsafe{_sys_stats};
-    // let mut config = unsafe{_config};
-
-
-    unsafe{update_procs(&mut _pid_table, &mut _processes, &mut _sys_stats, *_config);}
+    let mut filtered_vec: Vec<Process>;
+    unsafe{
+        update_procs(&mut _PID_TABLE, &mut _PROCESSES, &mut _SYS_STATS, *_CONFIG);
+        filtered_vec = _PROCESSES.clone();
+    }
+    filter_process(&mut filtered_vec);
 
     let mut siv = Cursive::default();
 
@@ -370,7 +346,7 @@ fn display_tui(columns_to_display: Vec<String>) {
                 _ => { println!("Invalid column name: {}", col_name); }
             }
         }
-    unsafe{ table.set_items(_processes.clone()); }
+    unsafe{ table.set_items(filtered_vec.clone()); }
 
     // Detect clicks on column headers
     table.set_on_sort(|siv: &mut Cursive, column: BasicColumn, order: Ordering| {        
@@ -389,27 +365,27 @@ fn display_tui(columns_to_display: Vec<String>) {
             .child( unsafe{
                 Dialog::around(LinearLayout::vertical()
                     .child(LinearLayout::horizontal()
-                        .child(TextView::new(format!("CPU Name: {}", _sys_stats.cpu_name)).h_align(HAlign::Left).with_name("cpu_name").full_width())
-                        .child(TextView::new(format!("CPU Frequency: {}MHz", _sys_stats.cpu_freq)).h_align(HAlign::Left).with_name("cpu_freq").full_width())
+                        .child(TextView::new(format!("CPU Name: {}", _SYS_STATS.cpu_name)).h_align(HAlign::Left).with_name("cpu_name").full_width())
+                        .child(TextView::new(format!("CPU Frequency: {}MHz", _SYS_STATS.cpu_freq)).h_align(HAlign::Left).with_name("cpu_freq").full_width())
                     )
                     .child(LinearLayout::horizontal()
-                        .child(TextView::new(format!("CPU Temperature: {} \u{00b0}\u{0043}", _sys_stats.cpu_temp)).h_align(HAlign::Left).with_name("cpu_temp").full_width())
-                        .child(TextView::new(format!("Number of cores: {}", _sys_stats.cpu_cores_num)).h_align(HAlign::Left).with_name("cpu_cores_num").full_width())
+                        .child(TextView::new(format!("CPU Temperature: {} \u{00b0}\u{0043}", _SYS_STATS.cpu_temp)).h_align(HAlign::Left).with_name("cpu_temp").full_width())
+                        .child(TextView::new(format!("Number of cores: {}", _SYS_STATS.cpu_cores_num)).h_align(HAlign::Left).with_name("cpu_cores_num").full_width())
                     )
                     .child(LinearLayout::horizontal()
-                        .child(TextView::new(format!("System Uptime: {}s", _sys_stats.uptime)).h_align(HAlign::Left).with_name("uptime").full_width())
-                        .child(TextView::new(format!("Memory: {}/{} MB",_sys_stats.ram_hist.front().unwrap(), _sys_stats.mem_total)).h_align(HAlign::Left).with_name("mem_total").full_width())
+                        .child(TextView::new(format!("System Uptime: {}s", _SYS_STATS.uptime)).h_align(HAlign::Left).with_name("uptime").full_width())
+                        .child(TextView::new(format!("Memory: {}/{} MB",_SYS_STATS.ram_hist.front().unwrap(), _SYS_STATS.mem_total)).h_align(HAlign::Left).with_name("mem_total").full_width())
                     )
                     .child(LinearLayout::horizontal()
-                        .child(TextView::new(format!("Swap Usage: {}%", _sys_stats.swap_hist.front().unwrap())).h_align(HAlign::Left).with_name("swap_usage").full_width())
-                        .child(TextView::new(format!("Number of processes: {}", _sys_stats.user_proc_count)).h_align(HAlign::Left).with_name("user_proc_count").full_width())
+                        .child(TextView::new(format!("Swap Usage: {}%", _SYS_STATS.swap_hist.front().unwrap())).h_align(HAlign::Left).with_name("swap_usage").full_width())
+                        .child(TextView::new(format!("Number of processes: {}", _SYS_STATS.user_proc_count)).h_align(HAlign::Left).with_name("user_proc_count").full_width())
                     )
                 )
                 .title("System Information") }
             )
             .child(Dialog::around(table.with_name("table").full_screen()).title("Processes"))
             .child(Dialog::around(LinearLayout::horizontal()
-                .child(TextView::new("Press <q> to exit. Press <space> to pause/unpase real time update.\nPress <k> while selecting a process to kill it."))
+                .child(TextView::new("Press <q> to exit. Press <space> to pause/unpase real time update.\nPress <k> to kill selected process. Press <p>/<r> to pause/unpause selected process."))
                 .child(TextView::new("Status: Updating in realtime...").h_align(HAlign::Right).with_name("status").full_width()
             )).title("Controls"))
     );
@@ -441,12 +417,71 @@ fn display_tui(columns_to_display: Vec<String>) {
             );
         }
     });
+
+    // add a callback to pause process when user presses 'p' while selecting a row
+    siv.add_global_callback('p',   |s| {
+        let mut pid = 0;
+        s.call_on_name("table", |view: &mut TableView<Process, BasicColumn>| {
+            let selected_row: usize = view.item().unwrap() as usize;
+            let selected_item = view.borrow_item(selected_row).unwrap().clone();
+            pid = selected_item.pid;
+        });
+        let success = pause_process(pid);
+        if success {
+            s.add_layer(
+                Dialog::around(TextView::new(format!("Successfully paused process {}", pid)))
+                    .title("Success")
+                    .button("Close", |s| {
+                        s.pop_layer();
+                    }),
+            );
+        } else {
+            s.add_layer(
+                Dialog::around(TextView::new(format!("Failed to pause process {}", pid)))
+                    .title("Error")
+                    .button("Close", |s| {
+                        s.pop_layer();
+                    }),
+            );
+        }
+    });
+
+    // add a callback to resume process when user presses 'r' while selecting a row
+    siv.add_global_callback('r',   |s| {
+        let mut pid = 0;
+        s.call_on_name("table", |view: &mut TableView<Process, BasicColumn>| {
+            let selected_row: usize = view.item().unwrap() as usize;
+            let selected_item = view.borrow_item(selected_row).unwrap().clone();
+            pid = selected_item.pid;
+        });
+        let success = resume_process(pid);
+        if success {
+            s.add_layer(
+                Dialog::around(TextView::new(format!("Successfully resumed process {}", pid)))
+                    .title("Success")
+                    .button("Close", |s| {
+                        s.pop_layer();
+                    }),
+            );
+        } else {
+            s.add_layer(
+                Dialog::around(TextView::new(format!("Failed to resume process {}", pid)))
+                    .title("Error")
+                    .button("Close", |s| {
+                        s.pop_layer();
+                    }),
+            );
+        }
+    });
+
     siv.add_global_callback(cursive::event::Event::Refresh, move |s| {
-        unsafe{update_views(s, &mut _processes, &mut _pid_table, &mut _sys_stats, *_config, counter);}
+        unsafe{
+            update_views(s, &mut _PROCESSES, &mut _PID_TABLE, &mut _SYS_STATS, *_CONFIG,counter);
+        }
         counter += 1;
     });
     siv.set_autorefresh(true);
-    siv.set_fps(unsafe{_config.update_every});
+    siv.set_fps(unsafe{_CONFIG.update_every});
     siv.run();
 }
 
@@ -455,6 +490,7 @@ fn update_views(siv: &mut Cursive, procs: &mut Vec<Process>, pid_table: &mut Has
     if counter % 1 == 0
     {
         update_procs(pid_table, procs, sys_stats, config);
+        filter_process(procs);
         siv.call_on_name("cpu_name", |view: &mut TextView| {
             view.set_content(format!("CPU Name: {}", sys_stats.cpu_name));
         });
@@ -505,24 +541,15 @@ fn custom_theme_from_cursive(siv: &Cursive) -> Theme {
 
 
 // main structures
-static mut _processes : Lazy<Vec<Process>> = Lazy::new(|| Vec::new()); 
-static mut _pid_table : Lazy<HashMap<u32, u16>> = Lazy::new(|| HashMap::new());
-static mut _sys_stats : Lazy<SysStats> = Lazy::new(|| SysStats::default());
-static mut _config : Lazy<Config> = Lazy::new(|| Config::start());
+static mut _PROCESSES : Lazy<Vec<Process>> = Lazy::new(|| Vec::new()); 
+static mut _PID_TABLE : Lazy<HashMap<u32, u16>> = Lazy::new(|| HashMap::new());
+static mut _SYS_STATS : Lazy<SysStats> = Lazy::new(|| SysStats::default());
+static mut _CONFIG : Lazy<Config> = Lazy::new(|| Config::start());
+static mut _FILTERS : Lazy<Vec<FilterItem>> = Lazy::new(|| Vec::new());
 
 static mut PAUSE_REC:bool = false;
 // main function
 fn main() {
-    
-
-    // _processes = Vec::new(); 
-    // _pid_table = HashMap::new();
-    // _sys_stats = SysStats::default();
-    // _config= Config::start();
-
-    // let mut recording_procs: Vec<u32>; // pass this to record_prc function, any proc to be recorded should be added to this
-    
-    // parse command line arguments
     let matches = Command::new("lpm")
         .version("0.1.0")
         .arg(
@@ -533,6 +560,7 @@ fn main() {
                 .value_name("COLUMN_LIST")
                 .help("Comma-separated list of columns to display, in the order they should appear")
                 .default_value("PID,PPID,PRI,CPU,MEM,STATE,STARTTIME,FD,OWNER,CMD")
+                .value_parser(["PID", "PPID", "PRI", "CPU", "MEM", "STATE", "STARTTIME", "FD", "OWNER", "CMD"])
                 .action(ArgAction::Append),
         )
         .arg(
@@ -546,22 +574,86 @@ fn main() {
             .default_value("0")
             .action(ArgAction::Append),
         )
+        .subcommand(
+            Command::new("filter")
+            .about("Filter the processes to be displayed")
+            .arg(
+                clap::Arg::new("target_column")
+                .short('c')
+                .long("columns")
+                .value_name("COLUMNS_TO_FILTER_ON")
+                .help("Comma-separated list of columns to be filtered on")
+                .value_delimiter(',')
+                .value_parser(["PID", "PPID", "PRI", "CPU", "MEM", "STATE", "STARTTIME", "FD", "OWNER", "CMD"])
+                .required(true)
+            )
+            .arg(
+                clap::Arg::new("filter_type")
+                .short('t')
+                .long("type")
+                .value_name("TYPE OF FILTER")
+                .help("Comma-separated list of type of filter to be applied on respective column")
+                .value_parser(["eq", "neq", "greater", "less"])
+                .default_value("eq")
+                .required(true)
+            )
+            .arg(
+                clap::Arg::new("filter_value")
+                .short('v')
+                .long("value")
+                .value_name("VALUE TO FILTER ON")
+                .help("Comma-separated list of values to be filtered on respective column with respective filter type")
+                .value_delimiter(',')
+                .required(true)
+            )
+        )
         .get_matches();
     
-let columns_to_display = matches.get_many::<String>("columns").unwrap().map(|s| s.trim().to_string().to_uppercase()).collect();
-    // test_update_procs();
-    //std::thread::spawn(|| {
+    let columns_to_display: Vec<String> = matches.get_many::<String>("columns").unwrap().map(|s| s.trim().to_string().to_uppercase()).collect();
 
-        display_tui(columns_to_display);
-
-        let recording_procs: Vec<u32> = matches.get_many::<u32>("record").expect("`pid`is required").copied().collect();
-    unsafe{ // for testing
-        if recording_procs[0] != 0 {
-            record_prc(&mut _processes, &mut _pid_table, recording_procs[0], recording_procs, &mut _config);
+    // let filter_columns: Vec<String> = matches.subcommand_matches("filter").unwrap_or(Vec::new()).get_many::<String>("target_column").unwrap().map(|s| s.to_string()).collect();
+    let filter_columns: Vec<String> = matches.subcommand_matches("filter")
+        .and_then(|subcommand| subcommand.get_many::<String>("target_column"))
+        .map(|columns| columns.map(|s| s.to_string()).collect())
+        .unwrap_or(vec![]);
+    let filter_types: Vec<String> = matches.subcommand_matches("filter")
+        .and_then(|subcommand| subcommand.get_many::<String>("filter_type"))
+        .map(|columns| columns.map(|s| s.to_string()).collect())
+        .unwrap_or(vec![]);
+    let filter_values: Vec<String> = matches.subcommand_matches("filter")
+        .and_then(|subcommand| subcommand.get_many::<String>("filter_value"))
+        .map(|columns| columns.map(|s| s.to_string()).collect())
+        .unwrap_or(vec![]);
+    
+    if filter_columns.len() != filter_types.len() || filter_columns.len() != filter_values.len() || filter_types.len() != filter_values.len() {
+        println!("Error: Number of columns to filter on, number of filter types and number of filter values are not equal");
+        std::process::exit(1);
+    }
+    unsafe{
+        _FILTERS.clear();
+        for i in 0..filter_columns.len() {
+            _FILTERS.push(
+                FilterItem{
+                    column: filter_columns[i].clone(), 
+                    value: filter_values[i].clone(),
+                    filter_type: filter_types[i].clone(),
+                }
+            );
         }
     }
 
-    //});
+    display_tui(columns_to_display);
+    unsafe
+    {
+        filter_process(&mut _PROCESSES);
+    }
+
+    let recording_procs: Vec<u32> = matches.get_many::<u32>("record").expect("`pid`is required").copied().collect();
+    unsafe{ // for testing
+        if recording_procs[0] != 0 {
+            record_prc(&mut _PROCESSES, &mut _PID_TABLE, recording_procs[0], recording_procs, &mut _CONFIG);
+        }
+    }
 }
  
 
@@ -583,12 +675,12 @@ fn record_prc(procs: &mut Vec<Process>, pid_table: &mut HashMap<u32, u16>, pid: 
         return
     }
     //let prc = &procs[pid_table[&pid] as usize];
-    let mut which_file: bool = false;
+    // let mut which_file: bool = false;
     let mut counter = 0;
     let mut stopped = false;
     //while recording_procs.iter().any(|e| pid.contains(e)) && unsafe{!PAUSE_REC} {
     while recording_procs.contains(&pid) && unsafe{!PAUSE_REC} {
-        unsafe{update_procs(&mut _pid_table, &mut _processes, &mut _sys_stats, *_config);} //REMOVE
+        unsafe{update_procs(&mut _PID_TABLE, &mut _PROCESSES, &mut _SYS_STATS, *_CONFIG);} //REMOVE
         if !pid_table.contains_key(&pid) {
             println!("-Process Exited-");
             return
@@ -626,18 +718,150 @@ fn record_prc(procs: &mut Vec<Process>, pid_table: &mut HashMap<u32, u16>, pid: 
     }
 }
 
-#[test]
-fn read_record(pid: u32) -> Process{
-
-}
-
 // function to kill the running process
 fn kill_process(pid: u32) -> bool {
     let output = std::process::Command::new("kill")
         .arg("-9")
         .arg(pid.to_string())
         .output()
-        .expect("failed to execute process");
+        .expect("failed to kill process");
 
     output.status.success()
+}
+
+fn pause_process(pid: u32) -> bool {
+    let output = std::process::Command::new("kill")
+        .arg("-STOP")
+        .arg(pid.to_string())
+        .output()
+        .expect("failed to pause process");
+
+    output.status.success()
+}
+
+fn resume_process(pid: u32) -> bool {
+    let output = std::process::Command::new("kill")
+        .arg("-CONT")
+        .arg(pid.to_string())
+        .output()
+        .expect("failed to resume process");
+
+    output.status.success()
+}
+
+fn filter_process(procs: &mut Vec<Process>)
+{
+    unsafe{
+        // read filters one by one from the _FILTERS vector
+        for filter in _FILTERS.iter() {
+            if filter.column == "PID" || filter.column == "PPID" || filter.column == "PRI" || filter.column == "FD" 
+            {
+                *procs = procs
+                        .into_iter()
+                        .filter(|p: &&mut Process| {
+                            let target_field_value = match filter.column.as_str() {
+                                "PID" => p.pid,
+                                "PPID" => p.parent_pid,
+                                "PRI" => p.priority as u32,
+                                "FD" => p.open_fds as u32,
+                                _ => 0,
+                            };
+
+                            let filter_field_value: u32 = match filter.column.as_str() {
+                                "PID" => filter.value.parse::<u32>().unwrap(),
+                                "PPID" => filter.value.parse::<u32>().unwrap(),
+                                "PRI" => filter.value.parse::<u32>().unwrap(),
+                                "FD" => filter.value.parse::<u32>().unwrap(),
+                                _ => 0,
+                            };
+
+                            match filter.filter_type.as_str() {
+                                "eq" => target_field_value == filter_field_value,
+                                "neq" => target_field_value != filter_field_value,
+                                "greater" => target_field_value > filter_field_value,
+                                "less" => target_field_value < filter_field_value,
+                                _ => false,
+                            }
+                })
+                .map(|p| p.clone())
+                .collect::<Vec<structures::Process>>();
+            } 
+            else if filter.column == "CMD" || filter.column == "OWNER" || filter.column == "STATE" 
+            {
+                *procs = procs
+                        .into_iter()
+                        .filter(|p| {
+                            let target_field_value = match filter.column.as_str() {
+                                "CMD" => p.name.clone(),
+                                "OWNER" => p.owner.clone(),
+                                "STATE" => format!("{:?}", p.state.procstate.clone()),
+                                _ => String::new(),
+                            };
+
+                    let filter_field_value = match filter.column.as_str() {
+                        "CMD" => filter.value.to_string(),
+                        "OWNER" => filter.value.to_string(),
+                        "STATE" => filter.value.to_string(),
+                        _ => String::new(),
+                    };
+
+                    match filter.filter_type.as_str() {
+                        "eq" => target_field_value == filter_field_value,
+                        "neq" => target_field_value != filter_field_value,
+                        "greater" => target_field_value > filter_field_value,
+                        "less" => target_field_value < filter_field_value,
+                        _ => false,
+                    }
+                })
+                .map(|p| p.clone())
+                .collect::<Vec<structures::Process>>();
+            } 
+            else if filter.column == "CPU" || filter.column == "MEM"
+            {
+                *procs = procs
+                        .into_iter()
+                        .filter(|p| {
+                            let target_field_value = match filter.column.as_str() {
+                                "CPU" => p.cpu_hist.front().unwrap() * 100 as f32,
+                                "MEM" => (p.ram_hist.front().unwrap() * 100) as f32/p._mem_total as f32,
+                                _ => 0.0,
+                            };
+
+                    let filter_field_value = match filter.column.as_str() {
+                        "CPU" => filter.value.parse::<f32>().unwrap(),
+                        "MEM" => filter.value.parse::<f32>().unwrap(),
+                        _ => 0.0,
+                    };
+
+                    match filter.filter_type.as_str() {
+                        "eq" => target_field_value == filter_field_value,
+                        "neq" => target_field_value != filter_field_value,
+                        "greater" => target_field_value > filter_field_value,
+                        "less" => target_field_value < filter_field_value,
+                        _ => false,
+                    }
+                })
+                .map(|p| p.clone())
+                .collect::<Vec<structures::Process>>();
+            }
+            else if filter.column == "STARTTIME"
+            {
+                *procs = procs
+                        .into_iter()
+                        .filter(|p| {
+                            let target_field_value = p.start_time;
+                            let filter_field_value = DateTime::parse_from_str(&filter.value, "%d/%m/%Y %H:%M").unwrap();
+                        match filter.filter_type.as_str() {
+                            "eq" => target_field_value == filter_field_value,
+                            "neq" => target_field_value != filter_field_value,
+                            "greater" => target_field_value > filter_field_value,
+                            "less" => target_field_value < filter_field_value,
+                            _ => false,
+                        }
+                })
+                .map(|p| p.clone())
+                .collect::<Vec<structures::Process>>();
+            }
+        }
+    }
 }

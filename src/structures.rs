@@ -107,3 +107,9 @@ pub enum BasicColumn {
     FD,
 }
 
+pub_struct! (FilterItem {
+    column: String,
+    value: String,
+    filter_type: String,
+});
+

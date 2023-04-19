@@ -81,6 +81,7 @@ pub_struct! (SysStats {
 pub struct Config {
     pub record_length : u32,
     pub update_every : u32,
+    pub max_rec_limit : u32,
 }
 impl Config {
     pub fn start() -> Config {
@@ -88,6 +89,7 @@ impl Config {
         Config {
             record_length: 10,
             update_every : 1,
+            max_rec_limit : 60000,
         }
     }
 }

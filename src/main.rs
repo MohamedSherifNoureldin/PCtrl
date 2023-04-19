@@ -8,6 +8,7 @@ use std::fs::read_to_string; // use unsafe with static muts for static lifetime 
 use once_cell::sync::Lazy;
 
 use std::num::NonZeroU32;
+use chrono::{DateTime, Local, Utc};
 
 use users::{get_user_by_uid, get_group_by_gid, Group}; // library for linux users
 use procfs::{ticks_per_second, Meminfo}; // proc reading library
@@ -25,10 +26,9 @@ extern crate cursive_table_view;
 extern crate dirs;
 
 use std::{thread, time::Duration};
-use std::fs::create_dir;
+use std::fs::{create_dir, OpenOptions};
+use std::io::{SeekFrom, Seek, Write};
 use clap::{Command, ArgAction};
-
-use chrono::DateTime;
 
 pub mod structures;
 use structures::*;
@@ -101,8 +101,7 @@ fn log_data<T>(list: &mut LinkedList<T>, val:T, config: Config) {
 fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys_stats: &mut SysStats, config: Config) {
     let mut child_queue: Vec<(u32, u32)> = Vec::new(); // ppid, pid
     let mut total_net = 0;
-    let mut proc_count = 0;
-
+    let mut proc_count:u32 = 0;
     let mut cpu_count: u8 = 0;
     let mut cpus_usage :Vec<f32> = Vec::new();
     let mut cpu_total = 0;
@@ -121,55 +120,71 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
         cpu_count += 1;
     }
     let mut last_read : u32 = 1;
+    //procs.clear();
+    pid_table.clear();
 
     for prc in procfs::process::all_processes().unwrap() {
         let prc = prc.unwrap();
         let stat = prc.stat().unwrap();
         if !prc.is_alive() {continue};  //For only reading alive proces, ie not dead or zombie
-        if stat.pid - last_read as i32 > 1 {
-            for i in (last_read+1)..(stat.pid as u32) {
-                if pid_table.contains_key(&(i.clone())) {
-                    if pid_table[&(i.clone())] < procs.len() as u16 {
-                        procs.remove(pid_table[&(i.clone())] as usize);
-                    }
-                    pid_table.remove(&(i.clone()));
-                    if pid_table.contains_key(&i) {
-                        println!("entry still exists");
-                        }
-                }
-            }
-        }
-        last_read = stat.pid as u32;
+        // if stat.pid - last_read as i32 > 1 {
+        //     for i in (last_read+1)..(stat.pid as u32) {
+        //         if pid_table.contains_key(&(i.clone())) {
+        //             if pid_table[&(i.clone())] < procs.len() as u16 {
+        //                 procs.remove(pid_table[&(i.clone())] as usize);
+        //             }
+        //             pid_table.remove(&(i.clone()));
+        //             if pid_table.contains_key(&i) {
+        //                 println!("entry still exists");
+        //                 }
+        //         }
+        //     }
+        // }
 
+        last_read = stat.pid as u32;
         proc_count += 1;
         let i: usize;
-        if pid_table.contains_key(&(stat.pid as u32)) {
-            i = pid_table[&(stat.pid as u32)] as usize; // index of desired process
-            if i < procs.len() { 
-                if procs[i].name != stat.comm { // proc has been replaced -> clear all history while updating
-                    procs[i].cpu_hist.clear();
-                    procs[i].ram_hist.clear();
-                    procs[i].disk_hist.clear();
-                    procs[i].net_hist.clear();
-                }
-            }
-        }
-        else {
-            i = procs.len();
-            pid_table.insert(stat.pid as u32, i as u16);
-            let newproc : Process = Process::default();
-            procs.push(newproc);
-        }
-        if i >= procs.len() { continue }
-        //let _prev_duration = ((procs[i].run_duration as i64 * tps as i64)  - ((stat.cutime + stat.cstime) as i64 + stat.guest_time.unwrap() as i64));
-        
-        // Read Proc data
-        procs[i].state.procstate = stat.state().unwrap();
-        //procs[i].name = stat.comm;
+        // if pid_table.contains_key(&(stat.pid as u32)) {
+        //     i = pid_table[&(stat.pid as u32)] as usize; // index of desired process
+        //     if i < procs.len() { 
+        //         if procs[i].name != stat.comm { // proc has been replaced -> clear all history while updating
+        //             procs[i].cpu_hist.clear();
+        //             procs[i].ram_hist.clear();
+        //             procs[i].disk_hist.clear();
+        //             procs[i].net_hist.clear();
+        //         }
+        //     }
+        // }
+
+        // else {
+
         let mut cmd: String = String::new();
         for entry in prc.cmdline().unwrap() {
             cmd.push_str(&format!("{} ", entry));
         }
+            
+        if proc_count as usize > procs.len() {
+            i = procs.len();
+            let newproc : Process = Process::default();
+            procs.push(newproc);
+        }
+        else {
+            i = proc_count as usize - 1;
+            if procs[i].name != stat.comm && procs[i].name != cmd { // proc has been replaced -> clear all history while updating
+                procs[i].cpu_hist.clear();
+                procs[i].ram_hist.clear();
+                procs[i].disk_hist.clear();
+                procs[i].net_hist.clear();
+            }
+        }
+
+        if i >= procs.len() { continue }
+        pid_table.insert(stat.pid as u32, i as u16);
+        
+        // Read Proc data
+        procs[i].state.procstate = stat.state().unwrap();
+        //procs[i].name = stat.comm;
+        
         
         if cmd.is_empty() {
             procs[i].name = stat.comm.clone();
@@ -181,7 +196,6 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
         procs[i].pid = stat.pid as u32;
         procs[i].parent_pid = stat.ppid as u32;
         procs[i].priority = stat.priority as u8;
-        //procs[i].run_duration = ((stat.utime + stat.stime + stat.cutime as u64 + stat.cstime as u64 + stat.guest_time.unwrap_or_default()) / tps) as u32;  
         procs[i].start_time = stat.starttime().unwrap();
         procs[i].dir = prc.exe().unwrap_or_default();
         procs[i].owner = get_user_by_uid(prc.uid().unwrap()).unwrap().name().to_str().unwrap().to_string();
@@ -219,7 +233,6 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
         };
         log_data(&mut procs[i].swap_hist, (stat.nswap /256) as u16, config); //swap in mb
         
-        
         let mut netsum:u32 = 0;
         let _devstatus = match prc.dev_status() {
             Err(_e) => {},
@@ -230,10 +243,7 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
                 }
             }
         };
-    
-        
         log_data(&mut procs[i].net_hist, netsum, config); //network usage in kb
-
         procs[i]._prev_duration = stat.utime+stat.stime;
     }
     for i in (last_read+1)..(procs[procs.len() -1].pid+1 as u32) { // check if latest procs have ended
@@ -247,9 +257,14 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
                 }
         }
     }
-    // check for any missed children procs assignment
-    for entry in child_queue {
-        procs[ pid_table[&entry.0] as usize].children.push(entry.1 as u32); // add missing children 
+    // // check for any missed children procs assignment
+    // for entry in child_queue {
+    //     procs[ pid_table[&entry.0] as usize].children.push(entry.1 as u32); // add missing children 
+    // }
+    if  procs.len() > proc_count as usize { // remove any extra processs at the end of the vector
+        for i in (proc_count as usize) .. procs.len() {
+            procs.remove(i);
+        }
     }
 
     // UPDATE SYSTEM DATA
@@ -257,10 +272,6 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
     let meminfo = Meminfo::new().unwrap();
     sys_stats.mem_total = (meminfo.mem_total as u64 / (1024*1024) as u64) as u32;
     log_data(&mut sys_stats.cpu_hist, cpus_usage, config);
-    // if sys_stats.disk_hist.len() > 2 {
-    //     println!("systemcpu: {}", 0.5 * (cpus_usage[0] + cpus_usage[1]) );
-    // }
-    //usedMem -= buffersMem + cachedMem;
     log_data(&mut sys_stats.ram_hist ,sys_stats.mem_total -  ((meminfo.mem_free) / (1024*1024)) as u32, config);
     let mut sum = 0;
     for d in procfs::diskstats().unwrap() {
@@ -272,7 +283,6 @@ fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys
     sys_stats.cpu_cores_num = cpu_count;
     sys_stats.user_proc_count = proc_count;
     
-
     let freq = read_to_string("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq").unwrap_or_default();
     let temp = read_to_string("/sys/class/thermal/thermal_zone0/temp").unwrap_or_default();
 
@@ -775,6 +785,37 @@ fn main() {
         _ => unsafe{_FILTERS.clear()},
     }
 
+    // // let filter_columns: Vec<String> = matches.subcommand_matches("filter").unwrap_or(Vec::new()).get_many::<String>("target_column").unwrap().map(|s| s.to_string()).collect();
+    // let filter_columns: Vec<String> = matches.subcommand_matches("filter")
+    //     .and_then(|subcommand| subcommand.get_many::<String>("target_column"))
+    //     .map(|columns| columns.map(|s| s.to_string()).collect())
+    //     .unwrap_or(vec![]);
+    // let filter_types: Vec<String> = matches.subcommand_matches("filter")
+    //     .and_then(|subcommand| subcommand.get_many::<String>("filter_type"))
+    //     .map(|columns| columns.map(|s| s.to_string()).collect())
+    //     .unwrap_or(vec![]);
+    // let filter_values: Vec<String> = matches.subcommand_matches("filter")
+    //     .and_then(|subcommand| subcommand.get_many::<String>("filter_value"))
+    //     .map(|columns| columns.map(|s| s.to_string()).collect())
+    //     .unwrap_or(vec![]);
+    
+    // if filter_columns.len() != filter_types.len() || filter_columns.len() != filter_values.len() || filter_types.len() != filter_values.len() {
+    //     println!("Error: Number of columns to filter on, number of filter types and number of filter values are not equal");
+    //     std::process::exit(1);
+    // }
+    // unsafe{
+    //     _FILTERS.clear();
+    //     for i in 0..filter_columns.len() {
+    //         _FILTERS.push(
+    //             FilterItem{
+    //                 column: filter_columns[i].clone(), 
+    //                 value: filter_values[i].clone(),
+    //                 filter_type: filter_types[i].clone(),
+    //             }
+    //         );
+    //     }
+    // }
+
     display_tui(columns_to_display);
     unsafe
     {
@@ -792,29 +833,33 @@ fn main() {
 fn record_prc(procs: &mut Vec<Process>, pid_table: &mut HashMap<u32, u16>, pid: u32, recording_procs: Vec<u32>, config: &mut Config) { // recordings exist in "/usr/local/pctrl/", process record format is plog
     let home = dirs::home_dir().unwrap().into_os_string().into_string().unwrap();
     let file_name = format!("{}/.local/share/pctrl/pctrl_{}.plog", home, pid);    
-    println!("{}/.local/share/pctrl", home);
+    //println!("{}/.local/share/pctrl", home);
+    
     if !Path::new(&format!("{}/.local/share/pctrl", home)).exists() {
         create_dir(&format!("{}/.local/share/pctrl", home)).unwrap();
     }
-    // let mut file = OpenOptions::new()
-    //     .write(true)
-    //     .create(true)
-    //     //.create_new(true)
-    //     .open(file_name)
-    //     .unwrap();
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create(true)
+        //.create_new(true)
+        //.append(true)
+        .open(file_name)
+        .unwrap();
     if !pid_table.contains_key(&pid) {
         println!("Err in records proc: couldn't find pid!");
         return
     }
+    println!("Recording process {}:{}...", pid, procs[pid_table[&pid] as usize].name);
     //let prc = &procs[pid_table[&pid] as usize];
     // let mut which_file: bool = false;
     let mut counter = 0;
     let mut stopped = false;
+    let mut i =0;
     //while recording_procs.iter().any(|e| pid.contains(e)) && unsafe{!PAUSE_REC} {
     while recording_procs.contains(&pid) && unsafe{!PAUSE_REC} {
         unsafe{update_procs(&mut _PID_TABLE, &mut _PROCESSES, &mut _SYS_STATS, *_CONFIG);} //REMOVE
         if !pid_table.contains_key(&pid) {
-            println!("-stopped-");
+            println!("-Process Exited-");
             return
         }
         let prc = Some(&procs[pid_table[&pid] as usize]);
@@ -822,31 +867,34 @@ fn record_prc(procs: &mut Vec<Process>, pid_table: &mut HashMap<u32, u16>, pid: 
             Some(&ref p) => {
                 let def32:u32 =0;
                 let def16:u16 = 0;
-                println!("{}", format!("{} {} {:?} {} {} {} {} {}", p.name, p.owner, 
+                let timestamp: DateTime<Utc> = DateTime::from_utc(Local::now().naive_utc(), Utc);
+                /*println!("{}", format!("{} {} {:?} {} {} {} {} {} {}", p.name, p.owner, 
                 p.state.procstate, p.cpu_hist.front().unwrap(), p.ram_hist.front().unwrap_or(&def32), 
-                p.disk_hist.front().unwrap_or(&def32), p.net_hist.front().unwrap_or(&def32), p.swap_hist.front().unwrap_or(&def16)));
-                //writeln!(&file, "{}", format!("{} {} {:?} {} {} {} {} {}", p.name, p.owner, 
-                //p.state.procstate, p.cpu_hist.front().unwrap(), p.ram_hist.front().unwrap(), 
-                //p.disk_hist.front().unwrap(), p.net_hist.front().unwrap(), p.swap_hist.front().unwrap()));
+                p.disk_hist.front().unwrap_or(&def32), p.net_hist.front().unwrap_or(&def32), p.swap_hist.front().unwrap_or(&def16), timestamp.format("%d/%m/%Y %H:%M:%S")));*/
+                writeln!(file, "{}", format!("{} {} {:?} {} {} {} {} {} {}", p.name, p.owner, 
+                p.state.procstate, p.cpu_hist.front().unwrap(), p.ram_hist.front().unwrap_or(&def32), 
+                p.disk_hist.front().unwrap_or(&def32), p.net_hist.front().unwrap_or(&def32), p.swap_hist.front().unwrap_or(&def16), timestamp.format("%d/%m/%Y %H:%M:%S"))).unwrap();
                 stopped = false
             }, // writing using the macro 'writeln!'
     
             None => {
-                //writeln!(&file, "-Process Exited-");
-                println!("-Process Exited-");
+                writeln!(file, "-Process Exited-").unwrap();
+                //println!("-Process Exited-");
                 stopped = true
             },
         }
         if !stopped {
             counter += 1;
-            if counter > config.record_length {
+            if counter > config.max_rec_limit {
                 // remove from beginning of file
-                //file.seek(SeekFrom::Start(0)).unwrap();
+                file.seek(SeekFrom::Start(0)).unwrap();
                 counter = 0;
             }
         }
         thread::sleep(Duration::from_secs(config.update_every as u64));
+        i += 1;
     }
+    
 }
 
 // function to kill the running process

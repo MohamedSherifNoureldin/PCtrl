@@ -18,10 +18,12 @@ use cursive::Cursive;
 use cursive::theme::{Color, PaletteColor, Theme, BorderStyle};
 use cursive::views::{Dialog, TextView, LinearLayout, EditView, DummyView, SelectView};
 use cursive_table_view::{TableView, TableViewItem };
+use cursive_tree_view::{Placement, TreeView};
 use cursive::CursiveExt;
 use cursive::align::HAlign;
 use cursive::traits::*;
 use std::cmp::Ordering;
+extern crate cursive_tree_view;
 extern crate cursive_table_view;
 extern crate dirs;
 
@@ -96,7 +98,6 @@ fn log_data<T>(list: &mut LinkedList<T>, val:T, config: Config) {
     }
     list.push_front(val);
 }
-
 
 // function to read system wide processes along with system wide data and update the data structures
 fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys_stats: &mut SysStats, config: Config) {
@@ -332,20 +333,6 @@ fn display_tui(columns_to_display: Vec<String>) {
     });
 
     let mut table = TableView::<Process, BasicColumn>::new();
-        // .column(BasicColumn::PID, "PID", |c| {
-        //     c.ordering(Ordering::Less)
-        //     .align(HAlign::Right)
-        //     .width(6)
-        // })
-        // .column(BasicColumn::PPID, "PPID", |c| c.align(HAlign::Right).width(8))
-        // .column(BasicColumn::PRIORITY, "PRI", |c| c.align(HAlign::Right).width(6))
-        // .column(BasicColumn::CPU, "CPU %", |c| c.align(HAlign::Right).width(9))
-        // .column(BasicColumn::MEM, "MEM %", |c| c.align(HAlign::Right).width(9))
-        // .column(BasicColumn::STATE, "STATE", |c| c.align(HAlign::Right).width(9))
-        // .column(BasicColumn::STARTTIME, "STARTTIME", |c| c.align(HAlign::Right).width(17))
-        // .column(BasicColumn::FD, "FD", |c| c.align(HAlign::Right).width(6))
-        // .column(BasicColumn::OWNER, "OWNER", |c| c.align(HAlign::Right).width(20))
-        // .column(BasicColumn::CMD, "CMD", |c| c.align(HAlign::Right));
 
     for col_name in columns_to_display {
             match col_name.as_str() {
@@ -366,7 +353,8 @@ fn display_tui(columns_to_display: Vec<String>) {
                 _ => { println!("Invalid column name: {}", col_name); }
             }
         }
-        table.set_items(processes_to_display.clone());
+
+    table.set_items(processes_to_display.clone());
 
     // Detect clicks on column headers
     table.set_on_sort(|siv: &mut Cursive, column: BasicColumn, order: Ordering| {        
@@ -551,6 +539,7 @@ fn display_tui(columns_to_display: Vec<String>) {
             })
         );
     });
+
     siv.add_global_callback('s', |siv|{
         siv.add_layer(
             Dialog::around(
@@ -599,6 +588,7 @@ fn display_tui(columns_to_display: Vec<String>) {
             })
         );
     });
+
     siv.add_global_callback('c', |siv|{
         siv.add_layer(Dialog::text("Clearing filters").title("Clearing filters").button("Ok", |s| {
             s.pop_layer();
@@ -608,7 +598,54 @@ fn display_tui(columns_to_display: Vec<String>) {
         }
     });
 
+    let mut pid_to_row: HashMap<u32, usize> = HashMap::new();
+    let mut row_counter = 0;
+
+    let mut new_processes = unsafe{_PROCESSES.clone()};
+    new_processes.sort_by(|a, b| a.pid.cmp(&b.pid));
+    // let mut tree = TreeView::new();
+    
+    // for process in new_processes.iter() {
+    //     if process.pid == 1 {
+    //         let row_id = tree.insert_item(format!("{} - {}", process.pid, process.name), Placement::LastChild, 0).unwrap();
+    //         row_counter += 1;
+    //         pid_to_row.insert(process.pid, row_id);
+    //         println!("Added {} with ppid {} to row {} and it got row_id {}", process.pid, process.parent_pid, 0, row_id);
+    //     }
+    //     else {
+    //         if pid_to_row.contains_key(&process.parent_pid) {
+    //             let row = pid_to_row.get(&process.parent_pid).unwrap();
+    //             let row_id = tree.insert_item(format!("{} - {}", process.pid, process.name), Placement::LastChild, (*row).try_into().unwrap()).unwrap();
+    //             row_counter += 1;
+    //             println!("Added {} with ppid {} to row {} and it got row_id {}", process.pid, process.parent_pid, row, row_id);
+    //             pid_to_row.insert(process.pid, row_id);
+    //         } else {
+    //             let row_id = tree.insert_item(format!("{} - {}", process.pid, process.name), Placement::LastChild, row_counter.try_into().unwrap()).unwrap();
+    //             row_counter += 1;
+    //             pid_to_row.insert(process.pid, row_id);
+    //             println!("ELSE:: Added {} with ppid {} to row {} and it got row_id {}", process.pid, process.parent_pid, row_counter, row_id);
+    //         }
+    //     }
+    // }
+
+    // // siv.add_layer(Dialog::text(format!("{:?}", pid_to_row)));
+    // siv.add_layer(Dialog::around(tree.scrollable().with_name("tree")).title("Processes").button("Ok", |s| {
+    //     s.pop_layer();
+    // }));
+
+    // let mut tree = TreeView::new();
+    // tree.insert_item("ROOT", Placement::LastChild, 0);
+    // tree.insert_item("1stChild", Placement::LastChild, 1);
+    // tree.insert_item("2ndChild", Placement::LastChild, 2);
+    // tree.insert_item("3rdChild", Placement::LastChild, 1);
+    // tree.insert_item("4thChild", Placement::LastChild, 4);
+    
+    siv.add_layer(Dialog::around(tree.scrollable().with_name("tree")).title("Processes").button("Ok", |s| {
+        s.pop_layer();
+    }));
+
     siv.run();
+    println!("{:?}", pid_to_row);
 }
 
 // function to update the table view in the TUI
@@ -971,8 +1008,7 @@ fn resume_process(pid: u32) -> bool {
     output.status.success()
 }
 
-fn filter_process(procs: &mut Vec<Process>) -> Vec<Process>
-{
+fn filter_process(procs: &mut Vec<Process>) -> Vec<Process> {
     let mut filtered_procs: Vec<Process> = procs.clone();
     unsafe{
         // read filters one by one from the _FILTERS vector

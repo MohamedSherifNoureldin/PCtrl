@@ -713,14 +713,14 @@ fn main() {
                 .value_parser(clap::value_parser!(u32))
                 .required(true)
             )
-            .arg(
-                clap::Arg::new("output_file")
-                .short('o')
-                .long("output_file")
-                .value_name("FILE_TO_RECORD_IN")
-                .help("File to record in")
-                .required(true)
-            )
+            // .arg(
+            //     clap::Arg::new("output_file")
+            //     .short('o')
+            //     .long("output_file")
+            //     .value_name("FILE_TO_RECORD_IN")
+            //     .help("File to record in")
+            //     .required(true)
+            // )
         )
         .subcommand(
             Command::new("filter")
@@ -876,7 +876,8 @@ fn record_prc(procs: &mut Vec<Process>, pid_table: &mut HashMap<u32, u16>, pid: 
     let home = dirs::home_dir().unwrap().into_os_string().into_string().unwrap();
     let file_name = format!("{}/.local/share/pctrl/pctrl_{}.plog", home, pid);    
     //println!("{}/.local/share/pctrl", home);
-    
+    unsafe{update_procs(&mut _PID_TABLE, &mut _PROCESSES, &mut _SYS_STATS, *_CONFIG);}
+
     if !Path::new(&format!("{}/.local/share/pctrl", home)).exists() {
         create_dir(&format!("{}/.local/share/pctrl", home)).unwrap();
     }

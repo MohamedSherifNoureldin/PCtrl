@@ -31,6 +31,8 @@ pub fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>,
     let mut cpu_total = 0;
     let uptime = procfs::Uptime::new().unwrap().uptime;
 
+    let mut childcounts = 0;
+
     for cpu in procfs::KernelStats::new().unwrap().cpu_time {
     	if sys_stats.cpu_hist.len() > 0 {
         }
@@ -74,6 +76,7 @@ pub fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>,
                 procs[i].disk_hist.clear();
                 procs[i].net_hist.clear();
             }
+            procs[i].children.clear();
         }
 
         if i >= procs.len() { continue }
@@ -107,6 +110,7 @@ pub fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>,
         if stat.ppid > 0 { // parent-child relating
             if pid_table.contains_key(&(stat.ppid as u32)) {
                 procs[pid_table[&(stat.ppid as u32)] as usize].children.push(stat.pid as u32);
+                childcounts += 1;
             }
             else {
                 child_queue.push((stat.ppid as u32, stat.pid as u32));

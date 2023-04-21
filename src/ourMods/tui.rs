@@ -123,10 +123,10 @@ pub fn display_tui(columns_to_display: Vec<String>) {
                 "CPU" => table = table.column(BasicColumn::CPU, "CPU %", |c| c.align(HAlign::Right).width(9)),
                 "MEM" => table = table.column(BasicColumn::MEM, "MEM %", |c| c.align(HAlign::Right).width(9)),
                 "STATE" => table = table.column(BasicColumn::STATE, "STATE", |c| c.align(HAlign::Right).width(9)),
-                "STARTTIME" => table = table.column(BasicColumn::STARTTIME, "STARTTIME", |c| c.align(HAlign::Right).width(17)),
+                "STARTTIME" => table = table.column(BasicColumn::STARTTIME, "STARTTIME", |c| c.align(HAlign::Right).width(15)),
                 "FD" => table = table.column(BasicColumn::FD, "FD", |c| c.align(HAlign::Right).width(6)),
-                "OWNER" => table = table.column(BasicColumn::OWNER, "OWNER", |c| c.align(HAlign::Right).width(20)),
-                "CMD" => table = table.column(BasicColumn::CMD, "CMD", |c| c.align(HAlign::Right)),
+                "OWNER" => table = table.column(BasicColumn::OWNER, "OWNER", |c| c.align(HAlign::Right).width(15)),
+                "CMD" => table = table.column(BasicColumn::CMD, "CMD", |c| c.align(HAlign::Left).width(15)),
                 _ => { println!("Invalid column name: {}", col_name); }
             }
         }
@@ -135,13 +135,13 @@ pub fn display_tui(columns_to_display: Vec<String>) {
 
     // Detect clicks on column headers
     table.set_on_sort(|siv: &mut Cursive, column: BasicColumn, order: Ordering| {        
-        siv.add_layer(
-            Dialog::around(TextView::new(format!("{} / {:?}", column.as_str(), order)))
-                .title("Sorted by")
-                .button("Close", |s| {
-                    s.pop_layer();
-                }),
-        );
+        // siv.add_layer(
+        //     Dialog::around(TextView::new(format!("{} / {:?}", column.as_str(), order)))
+        //         .title("Sorted by")
+        //         .button("Close", |s| {
+        //             s.pop_layer();
+        //         }),
+        // );
     });
 
 
@@ -410,16 +410,16 @@ pub fn display_tui(columns_to_display: Vec<String>) {
     //     s.pop_layer();
     // }));
 
-    let mut tree = TreeView::new();
-    tree.insert_item("ROOT", Placement::LastChild, 0);
-    tree.insert_item("1stChild", Placement::LastChild, 1);
-    tree.insert_item("2ndChild", Placement::LastChild, 2);
-    tree.insert_item("3rdChild", Placement::LastChild, 1);
-    tree.insert_item("4thChild", Placement::LastChild, 4);
+    // let mut tree = TreeView::new();
+    // tree.insert_item("ROOT", Placement::LastChild, 0);
+    // tree.insert_item("1stChild", Placement::LastChild, 1);
+    // tree.insert_item("2ndChild", Placement::LastChild, 2);
+    // tree.insert_item("3rdChild", Placement::LastChild, 1);
+    // tree.insert_item("4thChild", Placement::LastChild, 4);
     
-    siv.add_layer(Dialog::around(tree.scrollable().with_name("tree")).title("Processes").button("Ok", |s| {
-        s.pop_layer();
-    }));
+    // siv.add_layer(Dialog::around(tree.scrollable().with_name("tree")).title("Processes").button("Ok", |s| {
+    //     s.pop_layer();
+    // }));
 
     siv.run();
     println!("{:?}", pid_to_row);
@@ -540,5 +540,46 @@ pub fn filter_process(procs: &mut Vec<Process>) -> Vec<Process> {
             }
         }
     }
+    //construct tree ordering:
+    let mut i = 0;
+    let mut count = 0;
+    while i < filtered_procs.len() { // remove any children
+        if filtered_procs[i].parent_pid != 0 {
+            filtered_procs.remove(i);
+            count+=1;
+            continue;
+        }
+        i += 1;
+    }
+    //println!("{} lensize", filtered_procs.len().clone());
+    //println!("procs: {}", procs.len().clone());
+    i = 0;
+    while i < filtered_procs.len().clone() {
+        let mut saved_i = i;
+        let child_list = filtered_procs[i].children.clone();
+        //println!("childsize: {}", filtered_procs[i].children.len());
+        for child in child_list { 
+            saved_i += 1;
+            filtered_procs.insert(saved_i,  procs[unsafe {_PID_TABLE[&child] as usize } ].clone()); 
+            let mut parent_spaces: String = String::new();
+            for letter in filtered_procs[i].name.chars() {
+                if letter == ' ' {
+                    parent_spaces.push(letter);
+                }
+                else {
+                    break;
+                }
+            }
+            let name = filtered_procs[saved_i].name.clone();
+            filtered_procs[saved_i].name = format!("  {}{}", parent_spaces, name);
+            assert_eq!(filtered_procs[saved_i].parent_pid, filtered_procs[i].pid);
+            // println!("added: {} for index: {}", child, i.clone());
+        }
+        // println!("index: {}", i.clone());
+        i += 1;
+    }
+    // println!("Size: {}", filtered_procs.len().clone());
+    // println!("procs: {}", procs.len().clone());
+    //unsafe{ println!("PROC: {}", _PROCESSES.len().clone());}
     filtered_procs
 }

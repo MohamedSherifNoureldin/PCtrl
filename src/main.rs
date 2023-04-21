@@ -22,8 +22,8 @@ fn main() {
                 .value_delimiter(',')
                 .value_name("COLUMN_LIST")
                 .help("Comma-separated list of columns to display, in the order they should appear")
-                .default_value("PID,PPID,PRI,CPU,MEM,STATE,STARTTIME,FD,OWNER,CMD")
-                .value_parser(["PID", "PPID", "PRI", "CPU", "MEM", "STATE", "STARTTIME", "FD", "OWNER", "CMD"])
+                .default_value("PID,CMD,PRI,CPU,MEM,OWNER,STATE,STARTTIME,FD")
+                .value_parser(["PID", "PPID", "CMD", "PRI", "CPU", "MEM", "OWNER","STATE", "STARTTIME", "FD"])
                 .action(ArgAction::Append),
         )
         // .arg(
@@ -44,8 +44,8 @@ fn main() {
                 .short('p')
                 .long("pids")
                 .value_name("PIDS_TO_RECORD")
-                .help("Comma-separated list of PIDs to record")
-                .value_delimiter(',')
+                .help("PIDs to record")
+                //.value_delimiter(',')
                 .value_parser(clap::value_parser!(u32))
                 .required(true)
                 .action(ArgAction::Append)
@@ -200,10 +200,10 @@ fn main() {
     // }
     if !record_mode {
         display_tui(columns_to_display);
-        unsafe
-        {
-            filter_process(&mut _PROCESSES);
-        }
+        // unsafe
+        // {
+        //     filter_process(&mut _PROCESSES);
+        // }
     }
     
 }

@@ -40,6 +40,7 @@ macro_rules! pub_struct {
 // STRUCTS
 //#[derive(Default, Clone, Debug, PartialEq)]
 pub_struct! (Process {
+    index: u32,
     pid: u32,
     parent_pid: u32,
     children: Vec<u32>,
@@ -130,6 +131,7 @@ pub enum BasicColumn {
     STARTTIME,
     OWNER,
     FD,
+    Index,
 }
 
 pub_struct! (FilterItem {
@@ -153,6 +155,7 @@ impl BasicColumn {
             BasicColumn::STARTTIME => "StartTime",
             BasicColumn::OWNER => "OWNER",
             BasicColumn::FD => "FDs",
+            BasicColumn::Index => "index",
         }
     }
 }
@@ -178,6 +181,7 @@ impl TableViewItem<BasicColumn> for Process {
             BasicColumn::STARTTIME => format!("{}", self.start_time.format("%d/%m/%Y %H:%M")),
             BasicColumn::OWNER => self.owner.to_string(),
             BasicColumn::FD => format!("{}", self.open_fds),
+            BasicColumn::Index => self.index.to_string(),
         }
     }
 
@@ -185,7 +189,7 @@ impl TableViewItem<BasicColumn> for Process {
         match column {
             BasicColumn::PID => self.pid.cmp(&other.pid),
             BasicColumn::PPID => self.parent_pid.cmp(&other.parent_pid),
-            BasicColumn::CMD => self.name.cmp(&other.name),
+            BasicColumn::CMD => self.index.cmp(&other.index),
             BasicColumn::PRIORITY => self.priority.cmp(&other.priority),
             BasicColumn::CPU => self.cpu_hist.front().unwrap().partial_cmp(&other.cpu_hist.front().unwrap()).unwrap_or(Ordering::Equal),
             BasicColumn::MEM => self.ram_hist.front().unwrap().cmp(&other.ram_hist.front().unwrap()),
@@ -193,6 +197,7 @@ impl TableViewItem<BasicColumn> for Process {
             BasicColumn::STARTTIME => self.start_time.cmp(&other.start_time),
             BasicColumn::OWNER => self.owner.cmp(&other.owner),
             BasicColumn::FD => self.open_fds.cmp(&other.open_fds),
+            BasicColumn::Index => self.index.cmp(&self.index.clone()),
         }
     }
 }

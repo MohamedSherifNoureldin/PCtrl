@@ -22,6 +22,8 @@ extern crate cursive_table_view;
 use super::structures::*;
 use super::proc_functions::*;
 
+static mut SHOW_TREE: bool = true;
+
 // function to update the table view in the TUI
 fn update_views(siv: &mut Cursive, procs: &mut Vec<Process>, pid_table: &mut HashMap<u32, u16>, sys_stats: &mut SysStats, config: Config, counter: u32) {
     if counter % 1 == 0
@@ -87,7 +89,7 @@ pub fn display_tui(columns_to_display: Vec<String>) {
     }
 
     let mut siv = Cursive::default();
-
+    unsafe { SHOW_TREE = true; }
     let theme = custom_theme_from_cursive(&siv);
     siv.set_theme(theme);
 
@@ -97,7 +99,7 @@ pub fn display_tui(columns_to_display: Vec<String>) {
     // pause real time update by pressing space
     siv.add_global_callback(' ', |s| {
         if s.fps() == NonZeroU32::new(0) {
-            s.set_fps(1);
+            s.set_fps(unsafe{_CONFIG.update_every});
             s.call_on_name("status", |view: &mut TextView| {
                 view.set_content("Status: Updating in realtime...");
             });
@@ -125,16 +127,26 @@ pub fn display_tui(columns_to_display: Vec<String>) {
                 "STATE" => table = table.column(BasicColumn::STATE, "STATE", |c| c.align(HAlign::Right).width(9)),
                 "STARTTIME" => table = table.column(BasicColumn::STARTTIME, "STARTTIME", |c| c.align(HAlign::Right).width(15)),
                 "FD" => table = table.column(BasicColumn::FD, "FD", |c| c.align(HAlign::Right).width(6)),
-                "OWNER" => table = table.column(BasicColumn::OWNER, "OWNER", |c| c.align(HAlign::Right).width(15)),
+                "OWNER" => table = table.column(BasicColumn::OWNER, "OWNER", |c| c.align(HAlign::Right).width(8)),
                 "CMD" => table = table.column(BasicColumn::CMD, "CMD", |c| c.align(HAlign::Left).width(15)),
                 _ => { println!("Invalid column name: {}", col_name); }
             }
         }
 
-    table.set_items(processes_to_display.clone());
-
+    table.set_items(processes_to_display);
+    table.set_default_column(BasicColumn::CMD);
     // Detect clicks on column headers
-    table.set_on_sort(|siv: &mut Cursive, column: BasicColumn, order: Ordering| {        
+    //let mut booltest: &'static bool = &true;
+    table.set_on_sort( move |siv: &mut Cursive, column: BasicColumn, order: Ordering| {  
+         if (column == BasicColumn::PID || column == BasicColumn::CMD) {
+            unsafe {SHOW_TREE = true;}
+         }
+        else {
+            unsafe {SHOW_TREE = false;}
+        }
+        unsafe {
+            update_views(siv, &mut _PROCESSES, &mut _PID_TABLE, &mut _SYS_STATS, *_CONFIG,counter);
+        }
         // siv.add_layer(
         //     Dialog::around(TextView::new(format!("{} / {:?}", column.as_str(), order)))
         //         .title("Sorted by")
@@ -143,6 +155,9 @@ pub fn display_tui(columns_to_display: Vec<String>) {
         //         }),
         // );
     });
+    // if *booltest == true {
+    //     table.sort_by(BasicColumn::Index, Ordering::Less);
+    // }
 
 
     siv.add_layer(
@@ -170,9 +185,10 @@ pub fn display_tui(columns_to_display: Vec<String>) {
             )
             .child(Dialog::around(table.with_name("table").full_screen()).title("Processes"))
             .child(Dialog::around(LinearLayout::horizontal()
-            .child(TextView::new("Press <q> to exit. Press <space> to pause/unpase real time update.\nPress <k> to kill selected process. Press <p>/<r> to pause/unpause selected process.\nPress <s>/<ctrl+f> to search for a certain process by PID or CMD. Press <c> to clear all filters and searches."))
-            .child(TextView::new("Status: Updating in realtime...").h_align(HAlign::Right).with_name("status").full_width()
-            )).title("Controls"))
+            .child(TextView::new("Exit <q> - Pause/Unpause <space> - Kill <k> - Suspend/Resume <p>/<r> - Filter <s>/<ctrl+f> - Clear filters <c>"))
+            
+        ).title("Controls"))
+        .child(TextView::new("Status: Updating in realtime...").h_align(HAlign::Right).with_name("status").full_width())
     );
 
     // add a callback to kill process when user presses 'k' while selecting a row
@@ -378,8 +394,8 @@ pub fn display_tui(columns_to_display: Vec<String>) {
     let mut pid_to_row: HashMap<u32, usize> = HashMap::new();
     let mut row_counter = 0;
 
-    let mut new_processes = unsafe{_PROCESSES.clone()};
-    new_processes.sort_by(|a, b| a.pid.cmp(&b.pid));
+    // let mut new_processes = unsafe{_PROCESSES.clone()};
+    // new_processes.sort_by(|a, b| a.pid.cmp(&b.pid));
     // let mut tree = TreeView::new();
     
     // for process in new_processes.iter() {
@@ -540,43 +556,47 @@ pub fn filter_process(procs: &mut Vec<Process>) -> Vec<Process> {
             }
         }
     }
-    //construct tree ordering:
-    let mut i = 0;
-    let mut count = 0;
-    while i < filtered_procs.len() { // remove any children
-        if filtered_procs[i].parent_pid != 0 {
-            filtered_procs.remove(i);
-            count+=1;
-            continue;
-        }
-        i += 1;
-    }
-    //println!("{} lensize", filtered_procs.len().clone());
-    //println!("procs: {}", procs.len().clone());
-    i = 0;
-    while i < filtered_procs.len().clone() {
-        let mut saved_i = i;
-        let child_list = filtered_procs[i].children.clone();
-        //println!("childsize: {}", filtered_procs[i].children.len());
-        for child in child_list { 
-            saved_i += 1;
-            filtered_procs.insert(saved_i,  procs[unsafe {_PID_TABLE[&child] as usize } ].clone()); 
-            let mut parent_spaces: String = String::new();
-            for letter in filtered_procs[i].name.chars() {
-                if letter == ' ' {
-                    parent_spaces.push(letter);
-                }
-                else {
-                    break;
-                }
+    if unsafe {SHOW_TREE == true} {
+        //construct tree ordering:
+        let mut i = 0;
+        let mut count = 0;
+        while i < filtered_procs.len() { // remove any children
+            if filtered_procs[i].parent_pid != 0 {
+                filtered_procs.remove(i);
+                count+=1;
+                continue;
             }
-            let name = filtered_procs[saved_i].name.clone();
-            filtered_procs[saved_i].name = format!("  {}{}", parent_spaces, name);
-            assert_eq!(filtered_procs[saved_i].parent_pid, filtered_procs[i].pid);
-            // println!("added: {} for index: {}", child, i.clone());
+            i += 1;
         }
-        // println!("index: {}", i.clone());
-        i += 1;
+        //println!("{} lensize", filtered_procs.len().clone());
+        //println!("procs: {}", procs.len().clone());
+        i = 0;
+    
+        while i < filtered_procs.len().clone() {
+            let mut saved_i = i;
+            let child_list = filtered_procs[i].children.clone();
+            filtered_procs[i].index = i as u32;
+            //println!("childsize: {}", filtered_procs[i].children.len());
+            for child in child_list { 
+                saved_i += 1;
+                filtered_procs.insert(saved_i,  procs[unsafe {_PID_TABLE[&child] as usize } ].clone()); 
+                let mut parent_spaces: String = String::new();
+                for letter in filtered_procs[i].name.chars() {
+                    if letter == ' ' {
+                        parent_spaces.push(letter);
+                    }
+                    else {
+                        break;
+                    }
+                }
+                let name = filtered_procs[saved_i].name.clone();
+                filtered_procs[saved_i].name = format!("  {}{}", parent_spaces, name);
+                assert_eq!(filtered_procs[saved_i].parent_pid, filtered_procs[i].pid);
+                // println!("added: {} for index: {}", child, i.clone());
+            }
+            // println!("index: {}", i.clone());
+            i += 1;
+        }
     }
     // println!("Size: {}", filtered_procs.len().clone());
     // println!("procs: {}", procs.len().clone());

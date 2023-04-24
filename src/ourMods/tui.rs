@@ -50,7 +50,7 @@ fn update_views(siv: &mut Cursive, procs: &mut Vec<Process>, pid_table: &mut Has
             view.set_content(format!("Memory: {}/{}MB", sys_stats.ram_hist.front().unwrap(), sys_stats.mem_total));
         });
         siv.call_on_name("swap_usage", |view: &mut TextView| {
-            view.set_content(format!("Swap Usage: {}%", sys_stats.swap_hist.front().unwrap()));
+            view.set_content(format!("Swap Usage: {} MB", sys_stats.swap_hist.front().unwrap()));
         });
         siv.call_on_name("user_proc_count", |view: &mut TextView| {
             view.set_content(format!("Number of processes: {}", sys_stats.user_proc_count));
@@ -121,24 +121,24 @@ pub fn display_tui(columns_to_display: Vec<String>) {
                     .width(6)
                 }),
                 "PPID" => table = table.column(BasicColumn::PPID, "PPID", |c| c.align(HAlign::Right).width(8)),
-                "PRI" => table = table.column(BasicColumn::PRIORITY, "PRI", |c| c.align(HAlign::Right).width(6)),
-                "CPU" => table = table.column(BasicColumn::CPU, "CPU %", |c| c.align(HAlign::Right).width(9)),
-                "MEM" => table = table.column(BasicColumn::MEM, "MEM %", |c| c.align(HAlign::Right).width(9)),
-                "STATE" => table = table.column(BasicColumn::STATE, "STATE", |c| c.align(HAlign::Right).width(9)),
-                "STARTTIME" => table = table.column(BasicColumn::STARTTIME, "STARTTIME", |c| c.align(HAlign::Right).width(15)),
-                "FD" => table = table.column(BasicColumn::FD, "FD", |c| c.align(HAlign::Right).width(6)),
-                "OWNER" => table = table.column(BasicColumn::OWNER, "OWNER", |c| c.align(HAlign::Right).width(8)),
-                "CMD" => table = table.column(BasicColumn::CMD, "CMD", |c| c.align(HAlign::Left).width(15)),
+                "PRI" => table = table.column(BasicColumn::PRIORITY, "PRI", |c| c.align(HAlign::Right).width(3)),
+                "CPU" => table = table.column(BasicColumn::CPU, "CPU %", |c| c.align(HAlign::Right).width(5).ordering(Ordering::Greater)),
+                "MEM" => table = table.column(BasicColumn::MEM, "MEM %", |c| c.align(HAlign::Right).width(5).ordering(Ordering::Greater)),
+                "STATE" => table = table.column(BasicColumn::STATE, "STATE", |c| c.align(HAlign::Left).width(4).ordering(Ordering::Greater)),
+                "STARTTIME" => table = table.column(BasicColumn::STARTTIME, "STARTTIME", |c| c.align(HAlign::Right).width_percent(10)),
+                "FD" => table = table.column(BasicColumn::FD, "FD", |c| c.align(HAlign::Left).width(4).ordering(Ordering::Greater)),
+                "OWNER" => table = table.column(BasicColumn::OWNER, "OWNER", |c| c.align(HAlign::Left).width_percent(12)),
+                "CMD" => table = table.column(BasicColumn::CMD, "CMD - Tree", |c| c.align(HAlign::Left).width_percent(25)),
                 _ => { println!("Invalid column name: {}", col_name); }
             }
         }
 
     table.set_items(processes_to_display);
-    table.set_default_column(BasicColumn::CMD);
+    table.set_default_column(unsafe{_CONFIG.current_column.clone()});
     // Detect clicks on column headers
     //let mut booltest: &'static bool = &true;
     table.set_on_sort( move |siv: &mut Cursive, column: BasicColumn, order: Ordering| {  
-         if (column == BasicColumn::PID || column == BasicColumn::CMD) {
+         if (column == BasicColumn::CMD) {
             unsafe {SHOW_TREE = true;}
          }
         else {
@@ -146,6 +146,7 @@ pub fn display_tui(columns_to_display: Vec<String>) {
         }
         unsafe {
             update_views(siv, &mut _PROCESSES, &mut _PID_TABLE, &mut _SYS_STATS, *_CONFIG,counter);
+            _CONFIG.current_column = column;
         }
         // siv.add_layer(
         //     Dialog::around(TextView::new(format!("{} / {:?}", column.as_str(), order)))
@@ -177,7 +178,7 @@ pub fn display_tui(columns_to_display: Vec<String>) {
                         .child(TextView::new(format!("Memory: {}/{} MB",_SYS_STATS.ram_hist.front().unwrap(), _SYS_STATS.mem_total)).h_align(HAlign::Left).with_name("mem_total").full_width())
                     )
                     .child(LinearLayout::horizontal()
-                        .child(TextView::new(format!("Swap Usage: {}%", _SYS_STATS.swap_hist.front().unwrap())).h_align(HAlign::Left).with_name("swap_usage").full_width())
+                        .child(TextView::new(format!("Swap Usage: {} MB", _SYS_STATS.swap_hist.front().unwrap())).h_align(HAlign::Left).with_name("swap_usage").full_width())
                         .child(TextView::new(format!("Number of processes: {}", _SYS_STATS.user_proc_count)).h_align(HAlign::Left).with_name("user_proc_count").full_width())
                     )
                 )
@@ -185,7 +186,7 @@ pub fn display_tui(columns_to_display: Vec<String>) {
             )
             .child(Dialog::around(table.with_name("table").full_screen()).title("Processes"))
             .child(Dialog::around(LinearLayout::horizontal()
-            .child(TextView::new("Exit <q> - Pause/Unpause <space> - Kill <k> - Suspend/Resume <p>/<r> - Filter <s>/<ctrl+f> - Clear filters <c>"))
+            .child(TextView::new("Exit <q> - Pause/Unpause <space> - Kill <k> - Suspend/Resume <p>/<r> - Filter <s>/<ctrl+f> - Clear filters <c> - Save config <ctrl+s>").h_align(HAlign::Center))
             
         ).title("Controls"))
         .child(TextView::new("Status: Updating in realtime...").h_align(HAlign::Right).with_name("status").full_width())
@@ -332,6 +333,16 @@ pub fn display_tui(columns_to_display: Vec<String>) {
             })
         );
     });
+    siv.add_global_callback(cursive::event::Event::CtrlChar('s'), |siv|{
+        match saveConfig() {
+            Ok(_) => {},
+            Err(e) => {
+                siv.add_layer(Dialog::text("Failed to Save Configuration").title("Failed to Save Configuration File").button("Ok", |s| {
+                    s.pop_layer();
+                }));
+            },
+        };
+    });
 
     siv.add_global_callback('s', |siv|{
         siv.add_layer(
@@ -438,7 +449,7 @@ pub fn display_tui(columns_to_display: Vec<String>) {
     // }));
 
     siv.run();
-    println!("{:?}", pid_to_row);
+    //println!("{:?}", pid_to_row);
 }
 
 pub fn filter_process(procs: &mut Vec<Process>) -> Vec<Process> {
@@ -603,3 +614,4 @@ pub fn filter_process(procs: &mut Vec<Process>) -> Vec<Process> {
     //unsafe{ println!("PROC: {}", _PROCESSES.len().clone());}
     filtered_procs
 }
+

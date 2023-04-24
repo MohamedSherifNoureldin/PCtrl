@@ -101,8 +101,8 @@ pub fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>,
         procs[i].dir = prc.exe().unwrap_or_default();
         procs[i].owner = get_user_by_uid(prc.uid().unwrap()).unwrap().name().to_str().unwrap().to_string();
         procs[i].group = get_group_by_gid(stat.pgrp as u32).unwrap_or(Group::new(0, "none")).name().to_str().unwrap().to_string();
-        let _fdcout = match prc.fd_count() {
-            Ok(_fdcount) => {procs[i].open_fds = prc.fd_count().unwrap() as u16; // only for root user
+        match prc.fd_count() {
+            Ok(_fdcount) => {procs[i].open_fds = _fdcount as u16; // only for root user
             },
             Err(_e) => {},
         };
@@ -297,4 +297,27 @@ pub fn resume_process(pid: u32) -> bool {
         .expect("failed to resume process");
 
     output.status.success()
+}
+pub fn saveConfig() -> Result<(), std::io::Error> {
+    let home = dirs::home_dir().unwrap().into_os_string().into_string().unwrap();
+    let file_name = format!("{}/.local/share/pctrl/pctrl.conf", home); 
+    if !Path::new(&format!("{}/.local/share/pctrl", home)).exists() {
+        create_dir(&format!("{}/.local/share/pctrl", home)).unwrap();
+    }
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create(true)
+        //.create_new(true)
+        //.append(true)
+        .open(file_name)?;
+    let mut config : Config = unsafe {_CONFIG.clone()};
+
+    writeln!(file, "{}\n{}\n{}\n{}", config.record_length, config.update_every, config.max_rec_limit, config.current_column.as_str());    
+    let filters = unsafe{_FILTERS.clone()};
+    
+    for filter in filters {
+        writeln!(file, "{}|{}|{}", filter.column, filter.value, filter.filter_type);                    
+    };
+            
+    Ok(())
 }

@@ -106,6 +106,7 @@ pub struct Config {
     pub record_length : u32,
     pub update_every : u32,
     pub max_rec_limit : u32,
+    pub current_column : BasicColumn,
 }
 impl Config {
     pub fn start() -> Config {
@@ -114,6 +115,7 @@ impl Config {
             record_length: 10,
             update_every : 1,
             max_rec_limit : 60000,
+            current_column : BasicColumn::CMD,
         }
     }
 }
@@ -158,6 +160,22 @@ impl BasicColumn {
             BasicColumn::Index => "index",
         }
     }
+    pub fn from_str(input: &str) -> BasicColumn {
+        match input {
+            "PID" => BasicColumn::PID,
+            "PPID" => BasicColumn::PPID,
+            "CMD/Name" => BasicColumn::CMD,
+            "PRIORITY" => BasicColumn::PRIORITY,
+            "CPU %" => BasicColumn::CPU,
+            "MEM %" => BasicColumn::MEM,
+            "STATE" => BasicColumn::STATE,
+            "StartTime" => BasicColumn::STARTTIME,
+            "OWNER"=> BasicColumn::OWNER,
+            "FDs" => BasicColumn::FD,
+            "index" => BasicColumn::Index,
+            &_ => todo!(),
+        }
+    }
 }
 
 // TUI table column functions to display and compare data
@@ -169,16 +187,16 @@ impl TableViewItem<BasicColumn> for Process {
             BasicColumn::PPID => format!("{}", self.parent_pid),
             BasicColumn::CMD => self.name.to_string(),
             BasicColumn::PRIORITY => format!("{}", self.priority),
-            BasicColumn::CPU => format!("{:.4}", self.cpu_hist.front().unwrap() * 100 as f32),
+            BasicColumn::CPU => format!("{:.2}", self.cpu_hist.front().unwrap() * 100 as f32),
             BasicColumn::MEM => 
                 if self._mem_total == 0 {
-                    format!("0.0000")
+                    format!("0.00")
                 } else {
-                    format!("{:.4}", ((self.ram_hist.front().unwrap() * 100) as f32/self._mem_total as f32))
+                    format!("{:.2}", ((self.ram_hist.front().unwrap() * 100) as f32/self._mem_total as f32))
                 },
             // BasicColumn::MEM => format!("{:.4}", self.ram_hist.front().unwrap()),
             BasicColumn::STATE => format!("{:?}", self.state.procstate),
-            BasicColumn::STARTTIME => format!("{}", self.start_time.format("%d/%m/%Y %H:%M")),
+            BasicColumn::STARTTIME => format!("{}", self.start_time.format("%d/%m %H:%M")),
             BasicColumn::OWNER => self.owner.to_string(),
             BasicColumn::FD => format!("{}", self.open_fds),
             BasicColumn::Index => self.index.to_string(),

@@ -3,6 +3,7 @@ use std::vec::Vec;
 
 //cmd args
 use clap::{Command, ArgAction};
+use once_cell::sync::Lazy;
 
 //local imports
 pub mod ourMods;
@@ -10,9 +11,18 @@ use crate::ourMods::structures::*;
 use crate::ourMods::tui::*;
 use crate::ourMods::proc_functions::*;
 
+use std::io;
+use std::io::prelude::*;
+use std::fs::File;
+extern crate dirs;
+use std::path::Path;
+use std::fs::{create_dir, OpenOptions};
+
 
 // main function
 fn main() {
+    unsafe{ _CONFIG = Lazy::new(|| readConfig()); }; // read config file
+
     let matches = Command::new("lpm")
         .version("0.1.0")
         .arg(
@@ -208,3 +218,49 @@ fn main() {
     
 }
  
+fn readConfig() -> Config {
+    let home = dirs::home_dir().unwrap().into_os_string().into_string().unwrap();
+    let file_name = format!("{}/.local/share/pctrl/pctrl.conf", home); 
+    //let file_name = String::from("pctrl.conf"); 
+    let f = File::open(file_name);
+    let mut config :Config = Config::start();
+    let mut f = match f {
+        Ok(mut file) =>  {
+            let mut data = String::new();
+            file.read_to_string(&mut data);
+            let contents = data.split('\n').collect::<Vec<&str>>();
+
+            if contents.len() >= 4 {
+                config.record_length = contents[0].parse::<u32>().unwrap();
+                config.update_every = contents[1].parse::<u32>().unwrap();
+                config.max_rec_limit = contents[2].parse::<u32>().unwrap();
+                config.current_column = BasicColumn::from_str(contents[3]);
+                println!("read: {}", config.record_length);
+                println!("read: {}", config.update_every);
+                println!("read: {}", config.max_rec_limit);
+                println!("read: {}", config.current_column.as_str());
+                if contents.len() > 4 {
+                    for i in (4..contents.len()) {
+                        let parts = contents[i].split('|').collect::<Vec<&str>>();
+                        if parts.len() < 3 {break}
+                        let col = parts[0];
+                        let val = parts[1];
+                        let ftype = parts[2];
+                        println!("read: {} . {} . {}", col, val, ftype);
+                        unsafe{
+                            _FILTERS.push(FilterItem {
+                                column: col.to_string(),
+                                value: val.to_string(),
+                                filter_type: ftype.to_string(),
+                                
+                            });
+                        }
+                    }
+                }
+            }
+        },
+        Err(e) => { println!("Read nothing!");}
+    };
+
+    config
+}

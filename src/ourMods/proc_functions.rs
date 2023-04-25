@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::{thread, time::Duration};
 extern crate dirs;
 use std::fs::{create_dir, OpenOptions};
-use std::io::{SeekFrom, Seek, Write};
+use std::io::{SeekFrom, Seek, Write, stdout, self};
 use chrono::{DateTime, Local, Utc};
 use std::path::{Path};
 use std::fs::read_to_string; 
@@ -14,6 +14,8 @@ use users::{get_user_by_uid, get_group_by_gid, Group}; // library for linux user
 use procfs::{ticks_per_second, Meminfo}; // proc reading library
 
 use super::structures::*;
+
+use std::process::{Command, Stdio};
 
 fn log_data<T>(list: &mut LinkedList<T>, val:T, config: Config) {
     if list.len() == config.record_length as usize {
@@ -165,7 +167,9 @@ pub fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>,
     // }
     if  procs.len() > proc_count as usize { // remove any extra processs at the end of the vector
         for i in (proc_count as usize) .. procs.len() {
-            procs.remove(i);
+            if i < procs.len() {
+                procs.remove(i);
+            }
         }
     }
 
@@ -221,6 +225,7 @@ pub fn record_prc(procs: &mut Vec<Process>, pid_table: &mut HashMap<u32, u16>, p
         return
     }
     println!("Recording process {}:{}...", pid, procs[pid_table[&pid] as usize].name);
+    println!("Press <ctrl+c> to stop recording.");
     //let prc = &procs[pid_table[&pid] as usize];
     // let mut which_file: bool = false;
     let mut counter = 0;
@@ -320,4 +325,65 @@ pub fn saveConfig() -> Result<(), std::io::Error> {
     };
             
     Ok(())
+}
+
+pub fn keepAlive(_pid: u32) {
+    unsafe{
+        update_procs(&mut _PID_TABLE, &mut _PROCESSES, &mut _SYS_STATS, *_CONFIG);
+    }
+    let mut pid = _pid.clone();
+    if unsafe{ !_PID_TABLE.contains_key(&pid) } {
+        println!("Process not found - Make sure the process is already running to use keepAlive");
+        return;
+    }
+    let cmd = unsafe{ _PROCESSES[ _PID_TABLE[&pid] as usize ].name.clone() };
+
+    let mut running: bool = true;
+    println!("Keeping Alive PID:{} ..", pid);
+    println!("Press <ctrl+c> to stop keepAlive.");
+    while running  {        
+        
+        if unsafe{ !_PID_TABLE.contains_key(&pid)} {
+            //println!("cmd is {}", cmd);
+            // let parts = cmd.split(" ").collect::<Vec<&str>>();
+            // let args = &cmd[parts[0].len()..];
+            let output = Command::new("gnome-terminal")
+            .args(&["--tab", "--", "bash", "-c", cmd.clone().as_str()])
+            .output().expect("Failed to restart process");
+            // let output = Command::new("/bin/sh")
+            // .arg("-c")
+            // .arg(cmd.clone())
+            // .stdout(Stdio::piped())
+            // .spawn()
+            // //.output()
+            // .expect("Failed to restart process");
+            
+            //println!("output: {:?}", output);
+
+            //Command::new(parts[0]).arg(args).output().expect("Failed to restart process");
+            unsafe {
+                update_procs(&mut _PID_TABLE, &mut _PROCESSES, &mut _SYS_STATS, *_CONFIG);
+                for i in (0 .. _PROCESSES.len()).rev()  {
+                    //println!("{}", _PROCESSES[i].name.clone());
+                    if cmd == _PROCESSES[i].name {
+                        pid = _PROCESSES[i].pid;
+                        break;
+                    }
+                    else if i == 0 {
+                        println!("Failed to find pid");
+                        return
+                    }
+                }
+            }
+            println!("Process revived at {:?}, new PID: {}", chrono::offset::Local::now(), pid);
+        }
+
+        thread::sleep(Duration::from_secs( 1 ));
+
+        unsafe{
+            update_procs(&mut _PID_TABLE, &mut _PROCESSES, &mut _SYS_STATS, *_CONFIG);
+        }
+
+        //print!("\r");
+    }
 }

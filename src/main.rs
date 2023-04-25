@@ -21,8 +21,18 @@ use std::fs::{create_dir, OpenOptions};
 
 // main function
 fn main() {
+    // keepAlive(70717);
+    // return;
     unsafe{ _CONFIG = Lazy::new(|| readConfig()); }; // read config file
 
+    let args: Vec<_> = std::env::args().collect(); // get all arguements passed to app
+    if (args.len() > 1) {
+        if (args[1].to_lowercase() == "keepalive") {
+            keepAlive(args[2].trim().parse().unwrap_or(0));
+            return;
+        }
+    }
+    
     let matches = Command::new("lpm")
         .version("0.1.0")
         .arg(
@@ -34,6 +44,15 @@ fn main() {
                 .help("Comma-separated list of columns to display, in the order they should appear")
                 .default_value("PID,CMD,PRI,CPU,MEM,OWNER,STATE,STARTTIME,FD")
                 .value_parser(["PID", "PPID", "CMD", "PRI", "CPU", "MEM", "OWNER","STATE", "STARTTIME", "FD"])
+                .action(ArgAction::Append),
+        )
+        .arg(
+            clap::Arg::new("keepalive")
+                .long("keepalive")
+                .value_delimiter(',')
+                .value_name("revivePIDs")
+                .help("PID of the running process you want to keep alive.")
+                .default_value("0")
                 .action(ArgAction::Append),
         )
         // .arg(
@@ -69,6 +88,21 @@ fn main() {
             //     .required(true)
             // )
         )
+        // .subcommand(
+        //     Command::new("keepalive")
+        //     .about("Monitor and revive a process whener it crashes.")
+        //     .arg(
+        //         clap::Arg::new("keepalive_pid")
+        //         .short('p')
+        //         .long("pid")
+        //         .value_name("PIDS_TO_RECORD")
+        //         .help("PID to record")
+        //         //.value_delimiter(',')
+        //         .value_parser(clap::value_parser!(u32))
+        //         .required(true)
+        //         .action(ArgAction::Append)
+        //     )
+        // )
         .subcommand(
             Command::new("filter")
             .about("Filter the processes to be displayed")
@@ -208,6 +242,7 @@ fn main() {
 
     // if record argument is made {
     // }
+    
     if !record_mode {
         display_tui(columns_to_display);
         // unsafe
@@ -235,10 +270,10 @@ fn readConfig() -> Config {
                 config.update_every = contents[1].parse::<u32>().unwrap();
                 config.max_rec_limit = contents[2].parse::<u32>().unwrap();
                 config.current_column = BasicColumn::from_str(contents[3]);
-                println!("read: {}", config.record_length);
-                println!("read: {}", config.update_every);
-                println!("read: {}", config.max_rec_limit);
-                println!("read: {}", config.current_column.as_str());
+                // println!("read: {}", config.record_length);
+                // println!("read: {}", config.update_every);
+                // println!("read: {}", config.max_rec_limit);
+                // println!("read: {}", config.current_column.as_str());
                 if contents.len() > 4 {
                     for i in (4..contents.len()) {
                         let parts = contents[i].split('|').collect::<Vec<&str>>();
@@ -246,7 +281,7 @@ fn readConfig() -> Config {
                         let col = parts[0];
                         let val = parts[1];
                         let ftype = parts[2];
-                        println!("read: {} . {} . {}", col, val, ftype);
+                        // println!("read: {} . {} . {}", col, val, ftype);
                         unsafe{
                             _FILTERS.push(FilterItem {
                                 column: col.to_string(),

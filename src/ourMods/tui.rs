@@ -47,17 +47,17 @@ fn update_views(siv: &mut Cursive, procs: &mut Vec<Process>, pid_table: &mut Has
             view.set_content(format!("System Uptime: {}s", sys_stats.uptime));
         });
         siv.call_on_name("mem_total", |view: &mut TextView| {
-            view.set_content(format!("Memory: {}/{}MB", sys_stats.ram_hist.front().unwrap(), sys_stats.mem_total));
+            view.set_content(format!("Memory: {}/{}MB", sys_stats.ram_hist.front().unwrap_or(&0), sys_stats.mem_total));
         });
         siv.call_on_name("swap_usage", |view: &mut TextView| {
-            view.set_content(format!("Swap Usage: {} MB", sys_stats.swap_hist.front().unwrap()));
+            view.set_content(format!("Swap Usage: {} MB", sys_stats.swap_hist.front().unwrap_or(&0)));
         });
         siv.call_on_name("user_proc_count", |view: &mut TextView| {
             view.set_content(format!("Number of processes: {}", sys_stats.user_proc_count));
         });
         siv.call_on_name("table", |view: &mut TableView<Process, BasicColumn>| {
-            let selected_row = view.row().unwrap() as usize;
-            view.set_items_stable(processes_to_display.clone());
+            let selected_row = view.row().unwrap_or(0) as usize;
+            view.set_items_stable(processes_to_display);
             view.set_selected_row(selected_row);
         });
     }
@@ -116,18 +116,18 @@ pub fn display_tui(columns_to_display: Vec<String>) {
     for col_name in columns_to_display {
             match col_name.as_str() {
                 "PID" => table = table.column(BasicColumn::PID, "PID", |c| {
-                    c.ordering(Ordering::Less)
+                    c.ordering(Ordering::Greater)
                     .align(HAlign::Right)
                     .width(6)
                 }),
                 "PPID" => table = table.column(BasicColumn::PPID, "PPID", |c| c.align(HAlign::Right).width(8)),
-                "PRI" => table = table.column(BasicColumn::PRIORITY, "PRI", |c| c.align(HAlign::Right).width(3)),
-                "CPU" => table = table.column(BasicColumn::CPU, "CPU %", |c| c.align(HAlign::Right).width(5).ordering(Ordering::Greater)),
-                "MEM" => table = table.column(BasicColumn::MEM, "MEM %", |c| c.align(HAlign::Right).width(5).ordering(Ordering::Greater)),
-                "STATE" => table = table.column(BasicColumn::STATE, "STATE", |c| c.align(HAlign::Left).width(4).ordering(Ordering::Greater)),
-                "STARTTIME" => table = table.column(BasicColumn::STARTTIME, "STARTTIME", |c| c.align(HAlign::Right).width_percent(10)),
-                "FD" => table = table.column(BasicColumn::FD, "FD", |c| c.align(HAlign::Left).width(4).ordering(Ordering::Greater)),
-                "OWNER" => table = table.column(BasicColumn::OWNER, "OWNER", |c| c.align(HAlign::Left).width_percent(12)),
+                "PRI" => table = table.column(BasicColumn::PRIORITY, "PRI", |c| c.align(HAlign::Right).width(6)),
+                "CPU" => table = table.column(BasicColumn::CPU, "CPU %", |c| c.align(HAlign::Right).width(8).ordering(Ordering::Greater)),
+                "MEM" => table = table.column(BasicColumn::MEM, "MEM %", |c| c.align(HAlign::Right).width(8).ordering(Ordering::Greater)),
+                "STATE" => table = table.column(BasicColumn::STATE, "STATE", |c| c.align(HAlign::Left).width(8).ordering(Ordering::Greater)),
+                "STARTTIME" => table = table.column(BasicColumn::STARTTIME, "STARTED", |c| c.align(HAlign::Left).width_percent(12)),
+                "FD" => table = table.column(BasicColumn::FD, "FD", |c| c.align(HAlign::Left).width(7).ordering(Ordering::Greater)),
+                "OWNER" => table = table.column(BasicColumn::OWNER, "OWNER", |c| c.align(HAlign::Left).width_percent(9)),
                 "CMD" => table = table.column(BasicColumn::CMD, "CMD - Tree", |c| c.align(HAlign::Left).width_percent(25)),
                 _ => { println!("Invalid column name: {}", col_name); }
             }
@@ -454,9 +454,9 @@ pub fn display_tui(columns_to_display: Vec<String>) {
 
 pub fn filter_process(procs: &mut Vec<Process>) -> Vec<Process> {
     let mut filtered_procs: Vec<Process> = procs.clone();
-    unsafe{
+//    unsafe{
         // read filters one by one from the _FILTERS vector
-        for filter in _FILTERS.iter() {
+        for filter in unsafe{_FILTERS.iter()} {
             if filter.column == "PID" || filter.column == "PPID" || filter.column == "PRI" || filter.column == "FD" 
             {
                 filtered_procs = procs
@@ -471,10 +471,10 @@ pub fn filter_process(procs: &mut Vec<Process>) -> Vec<Process> {
                             };
 
                             let filter_field_value: u32 = match filter.column.as_str() {
-                                "PID" => filter.value.parse::<u32>().unwrap(),
-                                "PPID" => filter.value.parse::<u32>().unwrap(),
-                                "PRI" => filter.value.parse::<u32>().unwrap(),
-                                "FD" => filter.value.parse::<u32>().unwrap(),
+                                "PID" => filter.value.parse::<u32>().unwrap_or(0),
+                                "PPID" => filter.value.parse::<u32>().unwrap_or(0),
+                                "PRI" => filter.value.parse::<u32>().unwrap_or(0),
+                                "FD" => filter.value.parse::<u32>().unwrap_or(0),
                                 _ => 0,
                             };
 
@@ -525,14 +525,14 @@ pub fn filter_process(procs: &mut Vec<Process>) -> Vec<Process> {
                         .into_iter()
                         .filter(|p| {
                             let target_field_value = match filter.column.as_str() {
-                                "CPU" => p.cpu_hist.front().unwrap() * 100 as f32,
-                                "MEM" => (p.ram_hist.front().unwrap() * 100) as f32/p._mem_total as f32,
+                                "CPU" => p.cpu_hist.front().unwrap_or(&0.0) * 100 as f32,
+                                "MEM" => (p.ram_hist.front().unwrap_or(&0) * 100) as f32/p._mem_total as f32,
                                 _ => 0.0,
                             };
 
                     let filter_field_value = match filter.column.as_str() {
-                        "CPU" => filter.value.parse::<f32>().unwrap(),
-                        "MEM" => filter.value.parse::<f32>().unwrap(),
+                        "CPU" => filter.value.parse::<f32>().unwrap_or(0.0),
+                        "MEM" => filter.value.parse::<f32>().unwrap_or(0.0),
                         _ => 0.0,
                     };
 
@@ -553,7 +553,7 @@ pub fn filter_process(procs: &mut Vec<Process>) -> Vec<Process> {
                         .into_iter()
                         .filter(|p| {
                             let target_field_value: DateTime<chrono::Local> = p.start_time;
-                            let filter_field_value = DateTime::parse_from_str(&filter.value, "%d/%m/%Y %H:%M").unwrap();
+                            let filter_field_value = DateTime::parse_from_str(&filter.value, "%d/%m/%Y %H:%M").unwrap_or_default();
                         match filter.filter_type.as_str() {
                             "eq" => target_field_value == filter_field_value,
                             "neq" => target_field_value != filter_field_value,
@@ -566,12 +566,15 @@ pub fn filter_process(procs: &mut Vec<Process>) -> Vec<Process> {
                 .collect::<Vec<Process>>();
             }
         }
-    }
+    //}
     if unsafe {SHOW_TREE == true} {
         //construct tree ordering:
         let mut i = 0;
         let mut count = 0;
         while i < filtered_procs.len() { // remove any children
+            if i >= filtered_procs.len() {
+                break;
+            }
             if filtered_procs[i].parent_pid != 0 {
                 filtered_procs.remove(i);
                 count+=1;

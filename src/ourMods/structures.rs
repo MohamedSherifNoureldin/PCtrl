@@ -187,16 +187,17 @@ impl TableViewItem<BasicColumn> for Process {
             BasicColumn::PPID => format!("{}", self.parent_pid),
             BasicColumn::CMD => self.name.to_string(),
             BasicColumn::PRIORITY => format!("{}", self.priority),
-            BasicColumn::CPU => format!("{:.2}", self.cpu_hist.front().unwrap() * 100 as f32),
+            BasicColumn::CPU => format!("{:.2}", self.cpu_hist.front().unwrap_or(&0.0) * 100 as f32),
             BasicColumn::MEM => 
                 if self._mem_total == 0 {
                     format!("0.00")
                 } else {
-                    format!("{:.2}", ((self.ram_hist.front().unwrap() * 100) as f32/self._mem_total as f32))
+                    format!("{:.2}", ((self.ram_hist.front().unwrap_or(&0) * 100) as f32/self._mem_total as f32))
+                    //format!("{}", (self.net_hist.front().unwrap() ))
                 },
             // BasicColumn::MEM => format!("{:.4}", self.ram_hist.front().unwrap()),
             BasicColumn::STATE => format!("{:?}", self.state.procstate),
-            BasicColumn::STARTTIME => format!("{}", self.start_time.format("%d/%m %H:%M")),
+            BasicColumn::STARTTIME => format!("{}", self.start_time.format("%H:%M %d/%m")),
             BasicColumn::OWNER => self.owner.to_string(),
             BasicColumn::FD => format!("{}", self.open_fds),
             BasicColumn::Index => self.index.to_string(),
@@ -209,8 +210,8 @@ impl TableViewItem<BasicColumn> for Process {
             BasicColumn::PPID => self.parent_pid.cmp(&other.parent_pid),
             BasicColumn::CMD => self.index.cmp(&other.index),
             BasicColumn::PRIORITY => self.priority.cmp(&other.priority),
-            BasicColumn::CPU => self.cpu_hist.front().unwrap().partial_cmp(&other.cpu_hist.front().unwrap()).unwrap_or(Ordering::Equal),
-            BasicColumn::MEM => self.ram_hist.front().unwrap().cmp(&other.ram_hist.front().unwrap()),
+            BasicColumn::CPU => self.cpu_hist.front().unwrap_or(&0.0).partial_cmp(&other.cpu_hist.front().unwrap_or(&0.0)).unwrap_or(Ordering::Equal),
+            BasicColumn::MEM => self.ram_hist.front().unwrap_or(&0).cmp(&other.ram_hist.front().unwrap_or(&0)),
             BasicColumn::STATE => format!("{:?}", self.state.procstate).cmp(&format!("{:?}", &other.state.procstate)),
             BasicColumn::STARTTIME => self.start_time.cmp(&other.start_time),
             BasicColumn::OWNER => self.owner.cmp(&other.owner),

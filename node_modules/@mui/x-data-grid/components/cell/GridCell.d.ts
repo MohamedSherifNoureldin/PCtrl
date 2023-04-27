@@ -1,0 +1,33 @@
+import * as React from 'react';
+import { GridCellMode, GridRowId } from '../../models';
+import { GridAlignment } from '../../models/colDef/gridColDef';
+export interface GridCellProps<V = any, F = V> {
+    align: GridAlignment;
+    className?: string;
+    colIndex: number;
+    field: string;
+    rowId: GridRowId;
+    formattedValue?: F;
+    hasFocus?: boolean;
+    height: number | 'auto';
+    isEditable?: boolean;
+    isSelected?: boolean;
+    showRightBorder?: boolean;
+    value?: V;
+    width: number;
+    cellMode?: GridCellMode;
+    children: React.ReactNode;
+    tabIndex: 0 | -1;
+    colSpan?: number;
+    disableDragEvents?: boolean;
+    onClick?: React.MouseEventHandler<HTMLDivElement>;
+    onDoubleClick?: React.MouseEventHandler<HTMLDivElement>;
+    onMouseDown?: React.MouseEventHandler<HTMLDivElement>;
+    onMouseUp?: React.MouseEventHandler<HTMLDivElement>;
+    onKeyDown?: React.KeyboardEventHandler<HTMLDivElement>;
+    onDragEnter?: React.DragEventHandler<HTMLDivElement>;
+    onDragOver?: React.DragEventHandler<HTMLDivElement>;
+    [x: string]: any;
+}
+declare const MemoizedCell: React.MemoExoticComponent<React.ForwardRefExoticComponent<Omit<GridCellProps<any, any>, "ref"> & React.RefAttributes<HTMLDivElement>>>;
+export { MemoizedCell as GridCell };

@@ -13,11 +13,14 @@
     "@emotion/react": "^11.10.6",
     "@emotion/styled": "^11.10.6",
     "@mui/icons-material": "^5.11.16",
+    "@mui/lab": "^5.0.0-alpha.128",
     "@mui/material": "^5.12.2",
     "@mui/x-data-grid": "^6.2.1",
     "@tauri-apps/api": "^1.2.0",
+    "randomcolor": "^0.6.2",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "recharts": "^2.5.0"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^1.2.3",

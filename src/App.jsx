@@ -5,91 +5,98 @@ import { invoke } from "@tauri-apps/api/tauri";
 import * as React from 'react';
 import { DataGrid, GridToolbar } from '@mui/x-data-grid';
 import { Button, ButtonGroup } from '@mui/material';
+import new_theme from "./theme";
+import Container from '@mui/material/Container';
+import Paper from '@mui/material/Paper';
+import Box from '@mui/material/Box';
 
 import "./App.css";
 
+// icons
+import EqualizerIcon from '@mui/icons-material/Equalizer';
+import TableChartIcon from '@mui/icons-material/TableChart';
 
-const columns = [
-  { field: 'pid', headerName: 'PID', },
-  { field: 'name', headerName: 'CMD', width: 300 },
-  { field: 'priority', headerName: 'PRI'},
-  { field: 'parent_pid', headerName: 'PPID'},
-  { field: 'owner', headerName: 'OWNER'},
-  { field: 'state', headerName: 'STATE'},
-  { field: 'open_fds', headerName: 'FD'},
-  { field: 'start_time', headerName: 'STARTTIME', width : 300,
-    valueGetter: (params) => {
-      const options = {
-        hour: '2-digit',
-        minute: '2-digit',
-        day: '2-digit',
-        month: '2-digit'
-      };
-      return `${params.row.start_time ? new Date(params.row.start_time).toLocaleString('en-US', options) : ''}`
-    },
+//tabs
+import Tab from '@mui/material/Tab';
+import TabContext from '@mui/lab/TabContext';
+import TabList from '@mui/lab/TabList';
+import TabPanel from '@mui/lab/TabPanel';
 
-    
-  },
-];
+import ProcessesTable from "./ProcessesTable";
+import SystemInfo from "./SystemInfo";
 
 function App() {
   const [rows, setRows] = useState([]);
-  const [selectedRow, setSelectedRow] = useState(null);
+  const [systemInfo, setSystemInfo] = useState([])
+  const [pausedTableUpdate, setPausedTableUpdate] = useState(false);
 
-  function handleRowSelection(selection) {
-    setSelectedRow(selection.length > 0 ? selection[0] : null);
-  }
+  // graphs
+  const [cpuUsageData, setCpuUsageData] = useState([]);
 
-  function handleButtonClick() {
-    // Handle button click for the selected row
-  }
+  const MINUTE_MS = 1000;
 
   useEffect(() => {
-    let result = invoke("get_processes").then((res) => {
-      setRows(res);
-    });
-  }, []);
+    const interval = setInterval(() => {
+      if(pausedTableUpdate) return;
+      invoke("get_processes").then((res) => {
+        setRows(res);
+      });
+      invoke("get_system_info").then((res) => {
+        setSystemInfo(res);
+        console.log(res);
+        const cpuUsageData = res.cpu_hist.map((data, index) => {
+          const cores = data.reduce((acc, val, coreIndex) => {
+            acc[`core${coreIndex + 1}`] = val;
+            return acc;
+          }, {});
+        
+          return {
+            name: `${index + 1}st second`,
+            ...cores,
+          };
+        });
+        setCpuUsageData(cpuUsageData);
+        
+        console.log(cpuUsageData);
+      })
+      console.log("Updated Processes")
+    }, MINUTE_MS);
+  
+    return () => clearInterval(interval); // This represents the unmount function, in which you need to clear your interval to prevent memory leaks.
+  }, [pausedTableUpdate]);
+
+  // Tabs
+  const [value, setValue] = React.useState('1');
+
+  const handleValueChange = (event, newValue) => {
+    setValue(newValue);
+  };
+
   
   return (
-    <div className="container">
-      <h1>Welcome to LPM!</h1>
-      <div style={{ width: '100%' }}>
-        <DataGrid
-          getRowId={(row) => row.pid}
-          rows={rows}
-          columns={columns}
-          initialState={{
-            pagination: {
-              paginationModel: {
-                pageSize: 10,
-              },
-            },
-          }}
-          pageSizeOptions={[10]}
-          checkboxSelection
-          slots={{
-            toolbar: GridToolbar,
-          }}
-          onSelectionModelChange={handleRowSelection}
 
-        />
-      </div>
-      {selectedRow && (
-        <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <ButtonGroup
-            color="primary"
-            aria-label="row actions"
-            variant="contained"
-            size="large"
-          >
-            <Button onClick={handleButtonClick}>Action 1</Button>
-            <Button>Action 2</Button>
-            <Button>Action 3</Button>
-          </ButtonGroup>
-        </div>
-      )}
+    <TabContext value={value}>
+    <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+      <TabList onChange={handleValueChange} centered>
+        <Tab label="Table of Processes" value="1" icon={<TableChartIcon />} iconPosition="start"/>
+        <Tab label="System Information & Graphs" value="2" icon={<EqualizerIcon />} iconPosition="start"/>
+      </TabList>
+    </Box>
+    <TabPanel value="1" style={{padding: 0, margin: 0}}>
+      <ProcessesTable 
+        rows={rows}
+        pausedTableUpdate={pausedTableUpdate}
+        setPausedTableUpdate={setPausedTableUpdate}
+        />    
+    </TabPanel>
+    <TabPanel value="2">
+      <SystemInfo
+        systeminfo={systemInfo}
+        cpuUsageData={cpuUsageData}
+      />
+    </TabPanel>
+  </TabContext>
 
-    </div>
   );
 }
 

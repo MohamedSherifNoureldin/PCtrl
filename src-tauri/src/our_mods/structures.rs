@@ -5,7 +5,14 @@ use std::path::PathBuf;
 use chrono::{DateTime, Local};
 // use procfs::process::ProcState;
 
-use cursive_table_view::{TableViewItem };
+use cursive::Cursive;
+use cursive::theme::{Color, PaletteColor, Theme, BorderStyle};
+use cursive::views::{Dialog, TextView, LinearLayout, EditView, DummyView, SelectView};
+use cursive_table_view::{TableView, TableViewItem };
+use cursive_tree_view::{Placement, TreeView};
+use cursive::CursiveExt;
+use cursive::align::HAlign;
+use cursive::traits::*;
 use std::cmp::Ordering;
 use once_cell::sync::Lazy;
 use serde::{Serialize, Deserialize};

@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::{thread, time::Duration};
 extern crate dirs;
 use std::fs::{create_dir, OpenOptions};
-use std::io::{SeekFrom, Seek, Write, stdout, self};
+use std::io::{SeekFrom, Seek, Write};
 use chrono::{DateTime, Local, Utc};
 use std::path::{Path};
 use std::fs::read_to_string; 
@@ -15,7 +15,7 @@ use procfs::{ticks_per_second, Meminfo}; // proc reading library
 
 use super::structures::*;
 
-use std::process::{Command, Stdio};
+use std::process::{Command};
 
 fn log_data<T>(list: &mut LinkedList<T>, val:T, config: Config) {
     if list.len() == config.record_length as usize {
@@ -315,7 +315,7 @@ pub fn saveConfig() -> Result<(), std::io::Error> {
         //.create_new(true)
         //.append(true)
         .open(file_name)?;
-    let mut config : Config = unsafe {_CONFIG.clone()};
+    let config : Config = unsafe {_CONFIG.clone()};
 
     writeln!(file, "{}\n{}\n{}\n{}", config.record_length, config.update_every, config.max_rec_limit, config.current_column.as_str());    
     let filters = unsafe{_FILTERS.clone()};
@@ -338,7 +338,7 @@ pub fn keepAlive(_pid: u32) {
     }
     let cmd = unsafe{ _PROCESSES[ _PID_TABLE[&pid] as usize ].name.clone() };
 
-    let mut running: bool = true;
+    let running: bool = true;
     println!("Keeping Alive PID:{} ..", pid);
     println!("Press <ctrl+c> to stop keepAlive.");
     while running  {        
@@ -347,7 +347,7 @@ pub fn keepAlive(_pid: u32) {
             //println!("cmd is {}", cmd);
             // let parts = cmd.split(" ").collect::<Vec<&str>>();
             // let args = &cmd[parts[0].len()..];
-            let output = Command::new("gnome-terminal")
+            let _output = Command::new("gnome-terminal")
             .args(&["--tab", "--", "bash", "-c", cmd.clone().as_str()])
             .output().expect("Failed to restart process");
             // let output = Command::new("/bin/sh")

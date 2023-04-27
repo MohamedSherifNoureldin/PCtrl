@@ -11,12 +11,9 @@ use crate::ourMods::structures::*;
 use crate::ourMods::tui::*;
 use crate::ourMods::proc_functions::*;
 
-use std::io;
 use std::io::prelude::*;
 use std::fs::File;
 extern crate dirs;
-use std::path::Path;
-use std::fs::{create_dir, OpenOptions};
 
 
 // main function
@@ -26,8 +23,8 @@ fn main() {
     unsafe{ _CONFIG = Lazy::new(|| readConfig()); }; // read config file
 
     let args: Vec<_> = std::env::args().collect(); // get all arguements passed to app
-    if (args.len() > 1) {
-        if (args[1].to_lowercase() == "keepalive") {
+    if args.len() > 1 {
+        if args[1].to_lowercase() == "keepalive" {
             keepAlive(args[2].trim().parse().unwrap_or(0));
             return;
         }
@@ -259,8 +256,8 @@ fn readConfig() -> Config {
     //let file_name = String::from("pctrl.conf"); 
     let f = File::open(file_name);
     let mut config :Config = Config::start();
-    let mut f = match f {
-        Ok(mut file) =>  {
+    let mut _f = match f {
+        Ok(file) =>  {
             let mut data = String::new();
             file.read_to_string(&mut data);
             let contents = data.split('\n').collect::<Vec<&str>>();
@@ -275,7 +272,7 @@ fn readConfig() -> Config {
                 // println!("read: {}", config.max_rec_limit);
                 // println!("read: {}", config.current_column.as_str());
                 if contents.len() > 4 {
-                    for i in (4..contents.len()) {
+                    for i in 4..contents.len() {
                         let parts = contents[i].split('|').collect::<Vec<&str>>();
                         if parts.len() < 3 {break}
                         let col = parts[0];
@@ -287,14 +284,13 @@ fn readConfig() -> Config {
                                 column: col.to_string(),
                                 value: val.to_string(),
                                 filter_type: ftype.to_string(),
-                                
                             });
                         }
                     }
                 }
             }
         },
-        Err(e) => { println!("Read nothing!");}
+        Err(_e) => { println!("Read nothing!");}
     };
 
     config

@@ -1,0 +1,79 @@
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.unwrapGroupingColumnModel = exports.getColumnGroupsHeaderStructure = void 0;
+var _gridColumnGrouping = require("../../../models/gridColumnGrouping");
+var _utils = require("../../../utils/utils");
+// This is the recurrence function that help writing `unwrapGroupingColumnModel()`
+const recurrentUnwrapGroupingColumnModel = (columnGroupNode, parents, unwrappedGroupingModelToComplete) => {
+  if ((0, _gridColumnGrouping.isLeaf)(columnGroupNode)) {
+    if (unwrappedGroupingModelToComplete[columnGroupNode.field] !== undefined) {
+      throw new Error([`MUI: columnGroupingModel contains duplicated field`, `column field ${columnGroupNode.field} occurs two times in the grouping model:`, `- ${unwrappedGroupingModelToComplete[columnGroupNode.field].join(' > ')}`, `- ${parents.join(' > ')}`].join('\n'));
+    }
+    unwrappedGroupingModelToComplete[columnGroupNode.field] = parents;
+    return;
+  }
+  const {
+    groupId,
+    children
+  } = columnGroupNode;
+  children.forEach(child => {
+    recurrentUnwrapGroupingColumnModel(child, [...parents, groupId], unwrappedGroupingModelToComplete);
+  });
+};
+
+/**
+ * This is a function that provide for each column the array of its parents.
+ * Parents are ordered from the root to the leaf.
+ * @param columnGroupingModel The model such as provided in DataGrid props
+ * @returns An object `{[field]: groupIds}` where `groupIds` is the parents of the column `field`
+ */
+const unwrapGroupingColumnModel = columnGroupingModel => {
+  if (!columnGroupingModel) {
+    return {};
+  }
+  const unwrappedSubTree = {};
+  columnGroupingModel.forEach(columnGroupNode => {
+    recurrentUnwrapGroupingColumnModel(columnGroupNode, [], unwrappedSubTree);
+  });
+  return unwrappedSubTree;
+};
+exports.unwrapGroupingColumnModel = unwrapGroupingColumnModel;
+const getColumnGroupsHeaderStructure = (orderedColumns, unwrappedGroupingModel) => {
+  const getParents = field => unwrappedGroupingModel[field] ?? [];
+  const groupingHeaderStructure = [];
+  const maxDepth = Math.max(...orderedColumns.map(field => getParents(field).length));
+  const haveSameParents = (field1, field2, depth) => (0, _utils.isDeepEqual)(getParents(field1).slice(0, depth + 1), getParents(field2).slice(0, depth + 1));
+  for (let depth = 0; depth < maxDepth; depth += 1) {
+    const depthStructure = orderedColumns.reduce((structure, newField) => {
+      const groupId = getParents(newField)[depth] ?? null;
+      if (structure.length === 0) {
+        return [{
+          columnFields: [newField],
+          groupId
+        }];
+      }
+      const lastGroup = structure[structure.length - 1];
+      const prevField = lastGroup.columnFields[lastGroup.columnFields.length - 1];
+      const prevGroupId = lastGroup.groupId;
+      if (prevGroupId !== groupId || !haveSameParents(prevField, newField, depth)) {
+        // It's a new group
+        return [...structure, {
+          columnFields: [newField],
+          groupId
+        }];
+      }
+
+      // It extends the previous group
+      return [...structure.slice(0, structure.length - 1), {
+        columnFields: [...lastGroup.columnFields, newField],
+        groupId
+      }];
+    }, []);
+    groupingHeaderStructure.push(depthStructure);
+  }
+  return groupingHeaderStructure;
+};
+exports.getColumnGroupsHeaderStructure = getColumnGroupsHeaderStructure;

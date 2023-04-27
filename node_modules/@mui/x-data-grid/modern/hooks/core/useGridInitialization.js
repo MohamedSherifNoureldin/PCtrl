@@ -1,0 +1,19 @@
+import { useGridLoggerFactory } from './useGridLoggerFactory';
+import { useGridApiInitialization } from './useGridApiInitialization';
+import { useGridLocaleText } from './useGridLocaleText';
+import { useGridPipeProcessing } from './pipeProcessing';
+import { useGridStrategyProcessing } from './strategyProcessing';
+import { useGridStateInitialization } from './useGridStateInitialization';
+
+/**
+ * Initialize the technical pieces of the DataGrid (logger, state, ...) that any DataGrid implementation needs
+ */
+export const useGridInitialization = (inputApiRef, props) => {
+  const privateApiRef = useGridApiInitialization(inputApiRef, props);
+  useGridLoggerFactory(privateApiRef, props);
+  useGridStateInitialization(privateApiRef, props);
+  useGridPipeProcessing(privateApiRef);
+  useGridStrategyProcessing(privateApiRef);
+  useGridLocaleText(privateApiRef, props);
+  return privateApiRef;
+};

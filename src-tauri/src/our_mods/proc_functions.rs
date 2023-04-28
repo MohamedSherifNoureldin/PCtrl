@@ -1,39 +1,20 @@
 use std::collections::LinkedList;
 use std::vec::Vec;
-
 use std::collections::HashMap;
 
-
-
 use std::{thread, time::Duration};
-
 extern crate dirs;
-
 use std::fs::{create_dir, OpenOptions};
-
 use std::io::{SeekFrom, Seek, Write, stdout, self};
-
 use chrono::{DateTime, Local, Utc};
-
 use std::path::{Path};
-
 use std::fs::read_to_string; 
 
-
-
 use users::{get_user_by_uid, get_group_by_gid, Group}; // library for linux users
-
 use procfs::{ticks_per_second, Meminfo}; // proc reading library
-use sysinfo::{CpuRefreshKind, CpuExt, RefreshKind, System, SystemExt};
-
-
 use super::structures::*;
 
-
-
 use std::process::{Command, Stdio};
-
-
 
 fn log_data<T>(list: &mut LinkedList<T>, val:T, config: Config) {
 
@@ -71,56 +52,60 @@ pub fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>,
 
 
     sys_stats._idle.clear();
-    let syscpus = System::new_with_specifics(
-        RefreshKind::new().with_cpu(CpuRefreshKind::everything()),
-    );
-    for cpu in procfs::KernelStats::new().unwrap().cpu_time {
 
-    	if sys_stats.cpu_hist.len() > 0 {
+    let kstat = procfs::KernelStats::new().unwrap();
+    let cputime = kstat.cpu_time;
+    let cputot = kstat.total;
+    //let _cputot = ((cputot.user + cputot.nice + cputot.system + cputot.idle + cputot.iowait.unwrap_or(0) + cputot.irq.unwrap_or(0) + cputot.softirq.unwrap_or(0) + cputot.steal.unwrap_or(0)) / ticks_per_second()) as f64;
 
-        }
-
-        cpu_total.push(((cpu.user + cpu.nice + cpu.system + cpu.idle + cpu.iowait.unwrap_or(0) + cpu.irq.unwrap_or(0) + cpu.softirq.unwrap_or(0) + cpu.steal.unwrap_or(0)) / ticks_per_second()) as f64);// + cpu.guest.unwrap_or(0) + cpu.guest_nice.unwrap_or(0);
-
+    for cpu in cputime {
+        // + cpu.guest.unwrap_or(0) + cpu.guest_nice.unwrap_or(0);
+        
         //100.0 * ((stat.utime+stat.stime) - _prev_duration) as f32 / (cpu_total - sys_stats._cpu_total) as f32 * cpu_count as f32
 
         let idle:f64 = ((cpu.idle + cpu.iowait.unwrap_or(0)) / ticks_per_second()) as f64;
-        let mut var;
-        if sys_stats._cpu_total.len() <= cpu_count as usize {
-            var = 0 as f64;
-        }
-        else {
-            var = sys_stats._cpu_total[cpu_count as usize];
-        }
-         let mut var1;
-        if sys_stats._idle.len() <= cpu_count as usize {
-            var1 = 0 as f64;
-        }
-        else {
-            var1 = sys_stats._idle[cpu_count as usize];
-        }
-        let totald = cpu_total[cpu_count as usize] as f64 - var as f64;
+        let _cputot = ((cpu.user + cpu.nice + cpu.system + cpu.idle + cpu.iowait.unwrap_or(0) + cpu.irq.unwrap_or(0) + cpu.softirq.unwrap_or(0) + cpu.steal.unwrap_or(0)) / ticks_per_second()) as f64;
 
-        let idled = (idle - var1 / ticks_per_second() as f64) as f64;
+        // let mut var;
+        // if sys_stats._cpu_total.len() <= (cpu_count as i32-1) as usize || cpu_count == 0 {
+        //     var = 0 as f64;
+        // }
+        // else {
+        //     var = sys_stats._cpu_total[(cpu_count-1) as usize];
+        // }
+         //let mut var1;
+        // if sys_stats._idle.len() <= (cpu_count as i32 -1) as usize || cpu_count == 0 {
+        //     var1 = 0 as f64;
+        // }
+        // else {
+        //     var1 = sys_stats._idle[(cpu_count-1) as usize];
+        // }
+        //let totald = _cputot as f64 - var as f64;
+
+        //let idled = (idle - (var1 / ticks_per_second() as f64)) as f64;
 
 
 
         // ((stat.utime+stat.stime)/ticks_per_second()) as f32  / (uptime as f32 - (stat.starttime/ticks_per_second()) as f32)
-
-        //cpus_usage.push( (1.0 - idled/ totald)  as f32 * 100.0);
+        sys_stats._idle.push(idle);
+        cpu_total.push(_cputot);
+        cpus_usage.push( ((1.0 - (idle / _cputot)) * 100.0) as f32);
+        //println!("cputotal: {}", _cputot);
+        //println!("usage: {}", cpus_usage[cpu_count as usize]);
+        //println!("idle: {}", idle);
+        //println!("idled: {}", idled);
+        //println!("totald: {}", totald);
         //cpus_usage.push(s.cpus());
         //cpus_usage.push( (totald - idled) as f32/ totald as f32);
 
         
         
-        sys_stats._idle.push(idle);
+        
 
         cpu_count += 1;
 
     }
-    for cpu in syscpus.cpus() {
-        cpus_usage.push(cpu.cpu_usage());
-    }
+
 
     let mut last_read : u32 = 1;
 

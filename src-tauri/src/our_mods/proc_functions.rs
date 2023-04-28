@@ -71,7 +71,7 @@ pub fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>,
     let mut childcounts = 0;
 
 
-
+    sys_stats._idle.clear();
     for cpu in procfs::KernelStats::new().unwrap().cpu_time {
 
     	if sys_stats.cpu_hist.len() > 0 {
@@ -97,7 +97,7 @@ pub fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>,
         //cpus_usage.push( (totald - idled) as f32/ totald as f32);
 
         
-        sys_stats._idle.clear();
+        
         sys_stats._idle.push(idle);
 
         cpu_count += 1;

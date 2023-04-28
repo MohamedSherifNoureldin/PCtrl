@@ -78,7 +78,7 @@ pub fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>,
 
         }
 
-        cpu_total[cpu_count as usize] = ((cpu.user + cpu.nice + cpu.system + cpu.idle + cpu.iowait.unwrap_or(0) + cpu.irq.unwrap_or(0) + cpu.softirq.unwrap_or(0) + cpu.steal.unwrap_or(0)) / ticks_per_second()) as f64;// + cpu.guest.unwrap_or(0) + cpu.guest_nice.unwrap_or(0);
+        cpu_total.push(((cpu.user + cpu.nice + cpu.system + cpu.idle + cpu.iowait.unwrap_or(0) + cpu.irq.unwrap_or(0) + cpu.softirq.unwrap_or(0) + cpu.steal.unwrap_or(0)) / ticks_per_second()) as f64);// + cpu.guest.unwrap_or(0) + cpu.guest_nice.unwrap_or(0);
 
         //100.0 * ((stat.utime+stat.stime) - _prev_duration) as f32 / (cpu_total - sys_stats._cpu_total) as f32 * cpu_count as f32
 
@@ -97,8 +97,8 @@ pub fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>,
         //cpus_usage.push( (totald - idled) as f32/ totald as f32);
 
         
-
-        sys_stats._idle[cpu_count as usize] = idle;
+        sys_stats._idle.clear();
+        sys_stats._idle.push(idle);
 
         cpu_count += 1;
 

@@ -12,12 +12,9 @@ use crate::our_mods::tui::*;
 use crate::our_mods::proc_functions::*;
 use crate::our_mods::gui::*;
 
-use std::io;
 use std::io::prelude::*;
 use std::fs::File;
 extern crate dirs;
-use std::path::Path;
-use std::fs::{create_dir, OpenOptions};
 
 
 // main function
@@ -205,8 +202,8 @@ fn readConfig() -> Config {
     //let file_name = String::from("pctrl.conf"); 
     let f = File::open(file_name);
     let mut config :Config = Config::start();
-    let mut f = match f {
-        Ok(mut file) =>  {
+    let mut _f = match f {
+        Ok(file) =>  {
             let mut data = String::new();
             file.read_to_string(&mut data);
             let contents = data.split('\n').collect::<Vec<&str>>();
@@ -233,7 +230,6 @@ fn readConfig() -> Config {
                                 column: col.to_string(),
                                 value: val.to_string(),
                                 filter_type: ftype.to_string(),
-                                
                             });
                         }
                     }

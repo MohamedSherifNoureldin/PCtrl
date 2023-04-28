@@ -203,7 +203,7 @@ fn readConfig() -> Config {
     let f = File::open(file_name);
     let mut config :Config = Config::start();
     let mut _f = match f {
-        Ok(file) =>  {
+        Ok(mut file) =>  {
             let mut data = String::new();
             file.read_to_string(&mut data);
             let contents = data.split('\n').collect::<Vec<&str>>();

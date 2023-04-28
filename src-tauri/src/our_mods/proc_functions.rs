@@ -1,5 +1,4 @@
 use std::collections::LinkedList;
-
 use std::vec::Vec;
 
 use std::collections::HashMap;
@@ -25,7 +24,7 @@ use std::fs::read_to_string;
 use users::{get_user_by_uid, get_group_by_gid, Group}; // library for linux users
 
 use procfs::{ticks_per_second, Meminfo}; // proc reading library
-
+use sysinfo::{CpuRefreshKind, CpuExt, RefreshKind, System, SystemExt};
 
 
 use super::structures::*;
@@ -72,6 +71,9 @@ pub fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>,
 
 
     sys_stats._idle.clear();
+    let syscpus = System::new_with_specifics(
+        RefreshKind::new().with_cpu(CpuRefreshKind::everything()),
+    );
     for cpu in procfs::KernelStats::new().unwrap().cpu_time {
 
     	if sys_stats.cpu_hist.len() > 0 {
@@ -105,8 +107,8 @@ pub fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>,
 
         // ((stat.utime+stat.stime)/ticks_per_second()) as f32  / (uptime as f32 - (stat.starttime/ticks_per_second()) as f32)
 
-        cpus_usage.push( (1.0 - idled/ totald)  as f32 * 100.0);
-
+        //cpus_usage.push( (1.0 - idled/ totald)  as f32 * 100.0);
+        //cpus_usage.push(s.cpus());
         //cpus_usage.push( (totald - idled) as f32/ totald as f32);
 
         
@@ -115,6 +117,9 @@ pub fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>,
 
         cpu_count += 1;
 
+    }
+    for cpu in syscpus.cpus() {
+        cpus_usage.push(cpu.cpu_usage());
     }
 
     let mut last_read : u32 = 1;
@@ -377,7 +382,7 @@ pub fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>,
 
     sys_stats.mem_total = (meminfo.mem_total as u64 / (1024*1024) as u64) as u32;
 
-    log_data(&mut sys_stats.cpu_hist, cpus_usage, config);
+    log_data(&mut sys_stats.cpu_hist, cpus_usage.clone(), config);
 
     log_data(&mut sys_stats.ram_hist ,sys_stats.mem_total -  ((meminfo.mem_free) / (1024*1024)) as u32, config);
 
@@ -420,379 +425,190 @@ pub fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>,
     let cpuinfo = read_to_string("/proc/cpuinfo").unwrap_or_default();
 
     let model_name = cpuinfo.lines().find(|line| line.starts_with("model name")).unwrap_or_default();
-
     let model_name = model_name.split(":").nth(1).unwrap_or_default().trim();
-
     sys_stats.cpu_name = (*model_name).to_string();
-
     sys_stats._cpu_total = cpu_total;
-
 }
-
-
 
 pub fn record_prc(procs: &mut Vec<Process>, pid_table: &mut HashMap<u32, u16>, pid: u32, recording_procs: Vec<u32>, config: &mut Config) { // recordings exist in "/usr/local/pctrl/", process record format is plog
-
     let home = dirs::home_dir().unwrap().into_os_string().into_string().unwrap();
-
     let file_name = format!("{}/.local/share/pctrl/pctrl_{}.plog", home, pid);    
-
     //println!("{}/.local/share/pctrl", home);
-
     unsafe{update_procs(&mut _PID_TABLE, &mut _PROCESSES, &mut _SYS_STATS, *_CONFIG);}
 
-
-
     if !Path::new(&format!("{}/.local/share/pctrl", home)).exists() {
-
         create_dir(&format!("{}/.local/share/pctrl", home)).unwrap();
-
     }
-
     let mut file = OpenOptions::new()
-
         .write(true)
-
         .create(true)
-
         //.create_new(true)
-
         //.append(true)
-
         .open(file_name)
-
         .unwrap();
-
     if !pid_table.contains_key(&pid) {
-
         println!("Err in records proc: couldn't find pid!");
-
         return
-
     }
-
     println!("Recording process {}:{}...", pid, procs[pid_table[&pid] as usize].name);
-
     println!("Press <ctrl+c> to stop recording.");
-
     //let prc = &procs[pid_table[&pid] as usize];
-
     // let mut which_file: bool = false;
-
     let mut counter = 0;
-
     let mut stopped = false;
-
     let mut i =0;
-
     //while recording_procs.iter().any(|e| pid.contains(e)) && unsafe{!PAUSE_REC} {
-
     while recording_procs.contains(&pid) && unsafe{!PAUSE_REC} {
-
         unsafe{update_procs(&mut _PID_TABLE, &mut _PROCESSES, &mut _SYS_STATS, *_CONFIG);} //REMOVE
-
         if !pid_table.contains_key(&pid) {
-
             println!("-Process Exited-");
-
             return
-
         }
-
         let prc: Option<&Process> = Some(&procs[pid_table[&pid] as usize]);
-
         match prc {
-
             Some(&ref p) => {
-
                 let def32:u32 =0;
-
                 let def16:u16 = 0;
-
                 let timestamp: DateTime<Utc> = DateTime::from_utc(Local::now().naive_utc(), Utc);
-
                 /*println!("{}", format!("{} {} {:?} {} {} {} {} {} {}", p.name, p.owner, 
-
                 p.state.procstate, p.cpu_hist.front().unwrap(), p.ram_hist.front().unwrap_or(&def32), 
-
                 p.disk_hist.front().unwrap_or(&def32), p.net_hist.front().unwrap_or(&def32), p.swap_hist.front().unwrap_or(&def16), timestamp.format("%d/%m/%Y %H:%M:%S")));*/
-
                 writeln!(file, "{}", format!("{} {} {} {} {} {} {} {} {}", p.name, p.owner, 
-
                 p.state, p.cpu_hist.front().unwrap(), p.ram_hist.front().unwrap_or(&def32), 
-
                 p.disk_hist.front().unwrap_or(&def32), p.net_hist.front().unwrap_or(&def32), p.swap_hist.front().unwrap_or(&def16), timestamp.format("%d/%m/%Y %H:%M:%S"))).unwrap();
-
                 stopped = false
-
             }, // writing using the macro 'writeln!'
-
-    
-
             None => {
-
                 writeln!(file, "-Process Exited-").unwrap();
-
                 //println!("-Process Exited-");
-
                 stopped = true
-
             },
-
         }
-
         if !stopped {
-
             counter += 1;
-
             if counter > config.max_rec_limit {
-
                 // remove from beginning of file
-
                 file.seek(SeekFrom::Start(0)).unwrap();
-
                 counter = 0;
-
             }
-
         }
-
         thread::sleep(Duration::from_secs(config.update_every as u64));
-
         i += 1;
-
     }
-
-    
-
 }
 
-
-
 // function to kill the running process
-
 pub fn kill_process(pid: u32) -> bool {
-
     let output = std::process::Command::new("kill")
-
         .arg("-9")
-
         .arg(pid.to_string())
-
         .output()
-
         .expect("failed to kill process");
-
-
-
     output.status.success()
-
 }
 
 
 
 pub fn pause_process(pid: u32) -> bool {
-
     let output = std::process::Command::new("kill")
-
         .arg("-STOP")
-
         .arg(pid.to_string())
-
         .output()
-
         .expect("failed to pause process");
-
-
-
-    output.status.success()
-
+   output.status.success()
 }
-
-
 
 pub fn resume_process(pid: u32) -> bool {
-
     let output = std::process::Command::new("kill")
-
         .arg("-CONT")
-
         .arg(pid.to_string())
-
         .output()
-
         .expect("failed to resume process");
 
-
-
     output.status.success()
-
 }
-
 pub fn saveConfig() -> Result<(), std::io::Error> {
-
     let home = dirs::home_dir().unwrap().into_os_string().into_string().unwrap();
-
     let file_name = format!("{}/.local/share/pctrl/pctrl.conf", home); 
-
     if !Path::new(&format!("{}/.local/share/pctrl", home)).exists() {
-
         create_dir(&format!("{}/.local/share/pctrl", home)).unwrap();
-
     }
-
     let mut file = OpenOptions::new()
-
         .write(true)
-
         .create(true)
-
         //.create_new(true)
-
         //.append(true)
-
         .open(file_name)?;
-
     let mut config : Config = unsafe {_CONFIG.clone()};
 
-
-
     writeln!(file, "{}\n{}\n{}\n{}", config.record_length, config.update_every, config.max_rec_limit, config.current_column.as_str());    
-
     let filters = unsafe{_FILTERS.clone()};
-
     
-
     for filter in filters {
-
         writeln!(file, "{}|{}|{}", filter.column, filter.value, filter.filter_type);                    
-
     };
-
             
-
     Ok(())
-
 }
 
-
-
 pub fn keep_alive(_pid: u32) {
-
     unsafe{
-
         update_procs(&mut _PID_TABLE, &mut _PROCESSES, &mut _SYS_STATS, *_CONFIG);
-
     }
-
     let mut pid = _pid.clone();
-
     if unsafe{ !_PID_TABLE.contains_key(&pid) } {
-
         println!("Process not found - Make sure the process is already running to use keepAlive");
-
         return;
-
     }
-
     let cmd = unsafe{ _PROCESSES[ _PID_TABLE[&pid] as usize ].name.clone() };
 
-
-
     let mut running: bool = true;
-
     println!("Keeping Alive PID:{} ..", pid);
-
     println!("Press <ctrl+c> to stop keepAlive.");
-
     while running  {        
-
         
-
         if unsafe{ !_PID_TABLE.contains_key(&pid)} {
-
             //println!("cmd is {}", cmd);
-
             // let parts = cmd.split(" ").collect::<Vec<&str>>();
-
             // let args = &cmd[parts[0].len()..];
-
             let output = Command::new("gnome-terminal")
-
             .args(&["--tab", "--", "bash", "-c", cmd.clone().as_str()])
-
             .output().expect("Failed to restart process");
-
             // let output = Command::new("/bin/sh")
-
             // .arg("-c")
-
             // .arg(cmd.clone())
-
             // .stdout(Stdio::piped())
-
             // .spawn()
-
             // //.output()
-
             // .expect("Failed to restart process");
-
             
-
             //println!("output: {:?}", output);
 
-
-
             //Command::new(parts[0]).arg(args).output().expect("Failed to restart process");
-
             unsafe {
-
                 update_procs(&mut _PID_TABLE, &mut _PROCESSES, &mut _SYS_STATS, *_CONFIG);
-
                 for i in (0 .. _PROCESSES.len()).rev()  {
-
                     //println!("{}", _PROCESSES[i].name.clone());
-
                     if cmd == _PROCESSES[i].name {
-
                         pid = _PROCESSES[i].pid;
-
                         break;
-
                     }
-
                     else if i == 0 {
-
                         println!("Failed to find pid");
-
                         return
-
                     }
-
                 }
-
             }
-
             println!("Process revived at {:?}, new PID: {}", chrono::offset::Local::now(), pid);
-
         }
-
-
 
         thread::sleep(Duration::from_secs( 1 ));
 
-
-
         unsafe{
-
             update_procs(&mut _PID_TABLE, &mut _PROCESSES, &mut _SYS_STATS, *_CONFIG);
-
         }
 
-
-
-        //print!("\r");
+       //print!("\r");
 
     }
-
 }

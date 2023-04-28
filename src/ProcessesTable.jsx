@@ -16,7 +16,19 @@ import "./App.css";
 import CloseIcon from '@mui/icons-material/Close';
 import PauseIcon from '@mui/icons-material/Pause';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import SettingsIcon from '@mui/icons-material/Settings';
 
+// dialog
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogContentText from '@mui/material/DialogContentText';
+import DialogTitle from '@mui/material/DialogTitle';
+
+import InputLabel from '@mui/material/InputLabel';
+import MenuItem from '@mui/material/MenuItem';
+import FormControl from '@mui/material/FormControl';
+import Select from '@mui/material/Select';
 
 const columns = [
     { field: 'pid', headerName: 'PID', flex: 1 },
@@ -99,6 +111,25 @@ function ProcessesTable({rows, pausedTableUpdate, setPausedTableUpdate, selected
         console.log(res);
       });
     };
+
+    const changePriority = () => {
+      invoke("change_priority_process", { pid: selectedRow, priority: niceValue }).then((res) => {
+        console.log("Pri response:", res);
+        console.log("Nice value:", niceValue);
+        console.log("PID:", selectedRow);
+        closeDialog();
+      });
+    };
+
+    const [open, setOpen] = React.useState(false);
+    const openDialog = () => {
+      setOpen(true);
+    };
+    const closeDialog = () => {
+      setOpen(false);
+    };
+
+    const [niceValue, setNiceValue] = React.useState(0);
   
     return (
     <Box>
@@ -145,12 +176,78 @@ function ProcessesTable({rows, pausedTableUpdate, setPausedTableUpdate, selected
               alignItems: 'flex-end',
             }}
           >
+            <Button onClick={openDialog} startIcon={<SettingsIcon />}>Change Priority</Button>
             <Button onClick={killProcess} startIcon={<CloseIcon />}>Kill Process</Button>
             <Button onClick={pauseProcess} startIcon={<PauseIcon />}>Pause Process</Button>
             <Button onClick={resumeProcess} startIcon={<PlayArrowIcon />}>Resume Process</Button>
           </ButtonGroup>
           )}
         </div>
+        <Dialog open={open} onClose={closeDialog}>
+        <DialogTitle>Change Process Priority</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Please select a nice value from -20 to 19. Please note that the lower the nice value, the higher the priority. The actual priority is calculated as 20 + nice value. If you are not running this application as elevated, then you can only decrease the priority of the process.
+          </DialogContentText>
+          <FormControl fullWidth style={{marginTop: 20}}>
+            <InputLabel id="nice-value-select-label">Nice Value</InputLabel>
+            <Select
+              labelId="nice-value-select-label"
+              id="nice-value-select"
+              value={niceValue}
+              label="Nice Value"
+              onChange={(e) => setNiceValue(e.target.value)}
+            >
+              <MenuItem value={-20}>-20</MenuItem>
+              <MenuItem value={-19}>-19</MenuItem>
+              <MenuItem value={-18}>-18</MenuItem>
+              <MenuItem value={-17}>-17</MenuItem>
+              <MenuItem value={-16}>-16</MenuItem>
+              <MenuItem value={-15}>-15</MenuItem>
+              <MenuItem value={-14}>-14</MenuItem>
+              <MenuItem value={-13}>-13</MenuItem>
+              <MenuItem value={-12}>-12</MenuItem>
+              <MenuItem value={-11}>-11</MenuItem>
+              <MenuItem value={-10}>-10</MenuItem>
+              <MenuItem value={-9}>-9</MenuItem>
+              <MenuItem value={-8}>-8</MenuItem>
+              <MenuItem value={-7}>-7</MenuItem>
+              <MenuItem value={-6}>-6</MenuItem>
+              <MenuItem value={-5}>-5</MenuItem>
+              <MenuItem value={-4}>-4</MenuItem>
+              <MenuItem value={-3}>-3</MenuItem>
+              <MenuItem value={-2}>-2</MenuItem>
+              <MenuItem value={-1}>-1</MenuItem>
+              <MenuItem value={0}>0</MenuItem>
+              <MenuItem value={1}>1</MenuItem>
+              <MenuItem value={2}>2</MenuItem>
+              <MenuItem value={3}>3</MenuItem>
+              <MenuItem value={4}>4</MenuItem>
+              <MenuItem value={5}>5</MenuItem>
+              <MenuItem value={6}>6</MenuItem>
+              <MenuItem value={7}>7</MenuItem>
+              <MenuItem value={8}>8</MenuItem>
+              <MenuItem value={9}>9</MenuItem>
+              <MenuItem value={10}>10</MenuItem>
+              <MenuItem value={11}>11</MenuItem>
+              <MenuItem value={12}>12</MenuItem>
+              <MenuItem value={13}>13</MenuItem>
+              <MenuItem value={14}>14</MenuItem>
+              <MenuItem value={15}>15</MenuItem>
+              <MenuItem value={16}>16</MenuItem>
+              <MenuItem value={17}>17</MenuItem>
+              <MenuItem value={18}>18</MenuItem>
+              <MenuItem value={19}>19</MenuItem>
+            </Select>
+          </FormControl>
+              
+        </DialogContent>
+
+        <DialogActions>
+          <Button onClick={closeDialog}>Cancel</Button>
+          <Button onClick={changePriority}>Update Priority</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
     )
 }

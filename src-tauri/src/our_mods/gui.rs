@@ -1,7 +1,6 @@
 use crate::our_mods::proc_functions::*;
 use crate::our_mods::structures::*;
 use crate::our_mods::tui::*;
-use once_cell::sync::Lazy;
 
 #[tauri::command]
 fn get_processes() -> Vec<Process> {
@@ -32,6 +31,12 @@ fn resume_process(pid: u32) -> bool {
 }
 
 #[tauri::command]
+fn change_priority_process(pid: u32, priority: i32) -> bool {
+   let success = crate::our_mods::proc_functions::change_priority(pid, priority);
+   success
+}
+
+#[tauri::command]
 fn get_system_info() -> SysStats {
    let system_info;
    unsafe{
@@ -42,7 +47,7 @@ fn get_system_info() -> SysStats {
 
 pub fn display_gui() {
     tauri::Builder::default()
-      .invoke_handler(tauri::generate_handler![get_processes, kill_process, pause_process, resume_process, get_system_info])
+      .invoke_handler(tauri::generate_handler![get_processes, kill_process, pause_process, resume_process, get_system_info, change_priority_process])
       .run(tauri::generate_context!())
       .expect("error while running tauri application");
 }

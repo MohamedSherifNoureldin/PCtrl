@@ -17,15 +17,11 @@ use super::structures::*;
 use std::process::{Command, Stdio};
 
 fn log_data<T>(list: &mut LinkedList<T>, val:T, config: Config) {
-
     if list.len() == config.record_length as usize {
-
         list.cursor_back_mut().remove_current();
-
     }
 
     list.push_front(val);
-
 }
 
 macro_rules! min {
@@ -619,4 +615,17 @@ pub fn keep_alive(_pid: u32) {
        //print!("\r");
 
     }
+}
+
+pub fn change_priority(pid: u32, priority: i32) -> bool {
+    let mut output;
+    output = Command::new("renice")
+        .arg(format!("{}", priority))
+        .arg(format!("{}", pid))
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .output()
+        .expect("Failed to change priority");
+
+    output.status.success()
 }

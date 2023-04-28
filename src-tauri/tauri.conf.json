@@ -41,12 +41,10 @@
         "fullscreen": false,
         "resizable": true,
         "center": true,
-        "maximized": true,
+        "maximized": false,
         "title": "Linux Process Manager",
         "width": 1200,
-        "height": 1000,
-        "minWidth": 1200,
-        "minHeight": 1000
+        "height": 1000
       }
     ]
   }

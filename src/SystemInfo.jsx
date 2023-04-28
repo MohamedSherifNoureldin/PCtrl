@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import * as React from 'react';
 import Grid from '@mui/material/Unstable_Grid2'; // Grid version 2
 import randomColor from 'randomcolor';
+import { useMediaQuery } from '@mui/material';
 
 import { PieChart, Pie, Sector, BarChart, Bar, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
@@ -13,6 +14,8 @@ import { PieChart, Pie, Sector, BarChart, Bar, Cell, LineChart, Line, XAxis, YAx
 
 function SystemInfo({systeminfo, cpuUsageDataLineGraph, cpuUsageDataBarChart, memUsageDataLineGraph, memUsageDataPieChart}) 
 {    
+    const isSmallScreen = useMediaQuery((theme) => theme.breakpoints.down('md'));
+
     const colors = 
     [
         "#e2a461", "#95cced", "#1bc464", "#cf1df7", "#efb7ac", "#d3443d", "#f95d52", "#3aef37", "#3056dd", "#bdef58", "#d18504", "#8bedb9", "#9ffceb", "#2cd369", "#8becf4", "#f4a79a",
@@ -23,55 +26,55 @@ function SystemInfo({systeminfo, cpuUsageDataLineGraph, cpuUsageDataBarChart, me
     return (
         <Box>
             <Divider style={{paddingBottom: 15}}>
-                <Chip label="General Info" style={{width: 200}}/>
+                <Chip label="General Info" style={{width: 300}}/>
             </Divider>
-            <Grid container rowSpacing={1} columnSpacing={2}>
-                <Grid xs={6}>
+            <Grid container rowSpacing={1} columnSpacing={2} columns={{ xs: 6, sm: 6, md: 12 }}>
+                <Grid xs={6} style={{textAlign: isSmallScreen ? 'center' : 'left',}}>
                     <span><b>Uptime:</b> {systeminfo.uptime} seconds</span>
                 </Grid>
-                <Grid xs={6} style={{textAlign: 'right'}}>
+                <Grid xs={6} style={{textAlign: isSmallScreen ? 'center' : 'right',}}>
                     <span><b>Number of processes:</b> {systeminfo.user_proc_count}</span>
                 </Grid>
             </Grid>  
 
             <Divider style={{padding: 15}}>
-                <Chip label="CPU" style={{width: 200}}/>
+                <Chip label="CPU" style={{width: 300}}/>
             </Divider>
-            <Grid container rowSpacing={1} columnSpacing={2}>
-                <Grid xs={6}>
+            <Grid container rowSpacing={1} columnSpacing={2} columns={{ xs: 6, sm: 6, md: 12 }}>
+                <Grid xs={6} style={{textAlign: isSmallScreen ? 'center' : 'left',}}>
                     <span><b>Name:</b> {systeminfo.cpu_name}</span>
                 </Grid>
-                <Grid xs={6} style={{textAlign: 'right'}}>
+                <Grid xs={6} style={{textAlign: isSmallScreen ? 'center' : 'right',}}>
                     <span><b>Frequency:</b> {systeminfo.cpu_freq} MHz</span>
                 </Grid>
-                <Grid xs={6}>
+                <Grid xs={6} style={{textAlign: isSmallScreen ? 'center' : 'left',}}>
                     <span><b>Temperature:</b> {systeminfo.cpu_temp} °C</span>
                 </Grid>
-                <Grid xs={6} style={{textAlign: 'right'}}>
+                <Grid xs={6} style={{textAlign: isSmallScreen ? 'center' : 'right',}}>
                     <span><b>Number of Cores:</b> {systeminfo.cpu_cores_num}</span>
                 </Grid>
             </Grid>  
 
             <Divider style={{padding: 15}}>
-                <Chip label="Memory" style={{width: 200}}/>
+                <Chip label="Memory" style={{width: 300}}/>
             </Divider>
-            <Grid container rowSpacing={1} columnSpacing={2}>
-                <Grid xs={4}>
+            <Grid container rowSpacing={1} columnSpacing={2} columns={{ xs: 4, sm: 4, md: 12 }}>
+                <Grid xs={4} style={{textAlign: isSmallScreen ? 'center' : 'left',}}>
                     <span><b>Total Memory:</b> {systeminfo.mem_total} MB</span>
                 </Grid>
                 <Grid xs={4} style={{textAlign: 'center'}}>
                     <span><b>Used Memory:</b> {systeminfo.ram_hist[0]} MB</span>
                 </Grid>
-                <Grid xs={4} style={{textAlign: 'right'}}>
+                <Grid xs={4} style={{textAlign: isSmallScreen ? 'center' : 'right',}}>
                     <span><b>Swap Memory:</b> {systeminfo.swap_hist[0]} MB</span>
                 </Grid>
             </Grid>  
 
             <Divider style={{padding: 15}}>
-                <Chip label="CPU Graphs" style={{width: 200}}/>
+                <Chip label="CPU Graphs" style={{width: 300}}/>
             </Divider>
 
-            <Grid container rowSpacing={1} columnSpacing={2}>
+            <Grid container rowSpacing={1} columnSpacing={2} columns={{ xs: 6, sm: 6, md: 12 }}>
                 <Grid xs={6}>
                 <ResponsiveContainer width="100%" height="100%" minHeight={300} minWidth={500}>
                     <LineChart
@@ -137,9 +140,9 @@ function SystemInfo({systeminfo, cpuUsageDataLineGraph, cpuUsageDataBarChart, me
             </Grid>
 
             <Divider style={{padding: 15}}>
-                <Chip label="Memory Graphs" style={{width: 200}}/>
+                <Chip label="Memory Graphs" style={{width: 300}}/>
             </Divider>
-            <Grid container rowSpacing={1} columnSpacing={2}>
+            <Grid container rowSpacing={1} columnSpacing={2} columns={{ xs: 6, sm: 6, md: 12 }}>
                 <Grid xs={6}>
                     <ResponsiveContainer width="100%" height="100%" minHeight={300} minWidth={500}>
                         <LineChart

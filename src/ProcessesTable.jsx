@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import reactLogo from "./assets/react.svg";
 import { invoke } from "@tauri-apps/api/tauri";
 
 import * as React from 'react';
@@ -59,7 +58,10 @@ const columns = [
     },
     { field: 'memory_usage', headerName: 'MEM %', 
       valueGetter: (params) => {
-        return `${((params.row.ram_hist[0]/params.row._mem_total)*100).toFixed(4)}`
+        if(params.row._mem_total === 0)
+          return '0.0000';
+        else
+          return `${((params.row.ram_hist[0]/params.row._mem_total)*100).toFixed(4)}`
        },
        cellClassName: (params) => {
         let mem_usage = (params.row.ram_hist[0]/params.row._mem_total)*100;
@@ -77,12 +79,7 @@ const columns = [
   ];
   
 
-function ProcessesTable({rows, pausedTableUpdate, setPausedTableUpdate}) {
-
-
-    const [rowSelectionModel, setRowSelectionModel] = React.useState([]);
-    const [selectedRow, setSelectedRow] = useState(null);
-
+function ProcessesTable({rows, pausedTableUpdate, setPausedTableUpdate, selectedRow, setSelectedRow, rowSelectionModel, setRowSelectionModel}) {
 
     const killProcess = () => {
         invoke("kill_process", { pid: selectedRow }).then((res) => {
@@ -116,6 +113,9 @@ function ProcessesTable({rows, pausedTableUpdate, setPausedTableUpdate}) {
                 pageSize: 10,
               },
             },
+            sorting: {
+              sortModel: [{ field: 'pid', sort: 'desc' }],
+            },        
           }}
           pageSizeOptions={[10,20,30,40,50]}
           slots={{

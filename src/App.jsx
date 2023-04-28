@@ -15,6 +15,7 @@ import "./App.css";
 // icons
 import EqualizerIcon from '@mui/icons-material/Equalizer';
 import TableChartIcon from '@mui/icons-material/TableChart';
+import InsertChartIcon from '@mui/icons-material/InsertChart';
 
 //tabs
 import Tab from '@mui/material/Tab';
@@ -24,11 +25,16 @@ import TabPanel from '@mui/lab/TabPanel';
 
 import ProcessesTable from "./ProcessesTable";
 import SystemInfo from "./SystemInfo";
+import ProcessInfo from "./ProcessInfo";
 
 function App() {
   const [rows, setRows] = useState([]);
   const [systemInfo, setSystemInfo] = useState([])
   const [pausedTableUpdate, setPausedTableUpdate] = useState(false);
+
+  // table selection
+  const [rowSelectionModel, setRowSelectionModel] = React.useState([]);
+  const [selectedRow, setSelectedRow] = useState(null);
 
   // graphs
   // CPU
@@ -43,88 +49,86 @@ function App() {
   useEffect(() => {
     const interval = setInterval(() => {
       if(pausedTableUpdate) return;
-      invoke("get_processes").then((res) => {
-        setRows(res);
+      invoke("get_processes").then((procRes) => {
+        setRows(procRes);
+        console.log(procRes);
+        invoke("get_system_info").then((systemRes) => {
+          setSystemInfo(systemRes);
+          console.log(systemRes);
+          
+          // cpu
+          // cpu usage line graph data
+          const cpuUsageDataLineGraph = systemRes.cpu_hist.map((data, index) => {
+            const cores = data.reduce((acc, val, coreIndex) => {
+              acc[`core${coreIndex + 1}`] = val;
+              return acc;
+            }, {});
+          
+            return {
+              name: `${index + 1}st second`,
+              ...cores,
+            };
+          });
+          setCpuUsageDataLineGraph(cpuUsageDataLineGraph);
+  
+          // cpu usage bar chart data
+          const cpuUsageDataBarChart = systemRes.cpu_hist[0].map((coreUsage, index) => {
+            return {
+              core: `core${index + 1}`,
+              usage: coreUsage,
+            };
+          });
+          setCpuUsageDataBarChart(cpuUsageDataBarChart);
+  
+          // mem
+          // mem usage line graph data
+          const memUsageDataLineGraph = systemRes.ram_hist.map((data, index) => {
+            return {
+              name: `${index + 1}st second`,
+              mem_usage: data,
+              swap_usage: systemRes.swap_hist[index],
+            };
+          });
+          setMemUsageDataLineGraph(memUsageDataLineGraph);
+  
+          // mem usage pie chart data
+          const totalMemUsage = {};
+          let otherProcessesMemUsage = 0;
+          let totalUsedMemory = 0;
+          procRes.forEach((process) => {
+            const processName = process.name;
+            const ramHist = process.ram_hist;
+            const memUsage = ramHist[0]*100/systemRes.mem_total;
+  
+            // If the process's memory usage is greater than 5%, add it to the total memory usage object
+            if (memUsage > 5) {
+              totalMemUsage[processName] = memUsage;
+            }
+            // If the process's memory usage is less than or equal to 5%, add it to the total memory usage of other processes
+            if (memUsage <= 5) {
+              otherProcessesMemUsage += memUsage;
+            }
+            totalUsedMemory += memUsage;
+          });
+  
+          // Add the total memory usage of other processes to the total memory usage object
+          if (otherProcessesMemUsage > 0) {
+            totalMemUsage['Other Processes'] = otherProcessesMemUsage;
+          }
+  
+          // Add the total memory usage of the system to the total memory usage object
+          totalMemUsage['Free Memory'] = 100 - totalUsedMemory;
+
+          // Convert the total memory usage object to an array of objects with the desired format
+          const memUsageDataPieChart = Object.keys(totalMemUsage).map((processName) => ({
+            name: processName,
+            mem_usage: totalMemUsage[processName],
+          }));
+  
+          setMemUsageDataPieChart(memUsageDataPieChart);
+        })
+  
       });
-      invoke("get_system_info").then((res) => {
-        setSystemInfo(res);
-        console.log(res);
-        
-        // cpu
-        // cpu usage line graph data
-        const cpuUsageDataLineGraph = res.cpu_hist.map((data, index) => {
-          const cores = data.reduce((acc, val, coreIndex) => {
-            acc[`core${coreIndex + 1}`] = val;
-            return acc;
-          }, {});
-        
-          return {
-            name: `${index + 1}st second`,
-            ...cores,
-          };
-        });
-        setCpuUsageDataLineGraph(cpuUsageDataLineGraph);
-
-        // cpu usage bar chart data
-        const cpuUsageDataBarChart = res.cpu_hist[0].map((coreUsage, index) => {
-          return {
-            core: `core${index + 1}`,
-            usage: coreUsage,
-          };
-        });
-        setCpuUsageDataBarChart(cpuUsageDataBarChart);
-
-        // mem
-        // mem usage line graph data
-        const memUsageDataLineGraph = res.ram_hist.map((data, index) => {
-          return {
-            name: `${index + 1}st second`,
-            mem_usage: data,
-            swap_usage: res.swap_hist[index],
-          };
-        });
-        setMemUsageDataLineGraph(memUsageDataLineGraph);
-
-        // mem usage pie chart data
-        const totalMemUsage = {};
-        let otherProcessesMemUsage = 0;
-        let totalUsedMemory = 0;
-        rows.forEach((process) => {
-          const processName = process.name;
-          const ramHist = process.ram_hist;
-          const memUsage = ramHist[0]*100/systemInfo.mem_total;
-
-          // If the process's memory usage is greater than 5%, add it to the total memory usage object
-          if (memUsage > 5) {
-            totalMemUsage[processName] = memUsage;
-          }
-          // If the process's memory usage is less than or equal to 5%, add it to the total memory usage of other processes
-          if (memUsage <= 5) {
-            otherProcessesMemUsage += memUsage;
-          }
-          totalUsedMemory += memUsage;
-        });
-
-        // Add the total memory usage of other processes to the total memory usage object
-        if (otherProcessesMemUsage > 0) {
-          totalMemUsage['Other Processes'] = otherProcessesMemUsage;
-        }
-
-        // Add the total memory usage of the system to the total memory usage object
-        totalMemUsage['Free Memory'] = 100 - totalUsedMemory;
-        console.log(totalMemUsage);
-        console.log(totalUsedMemory);
-
-        // Convert the total memory usage object to an array of objects with the desired format
-        const memUsageDataPieChart = Object.keys(totalMemUsage).map((processName) => ({
-          name: processName,
-          mem_usage: totalMemUsage[processName],
-        }));
-
-        setMemUsageDataPieChart(memUsageDataPieChart);
-      })
-
-      console.log(memUsageDataPieChart);
 
       console.log("Updated Processes")
     }, MINUTE_MS);
@@ -147,6 +151,9 @@ function App() {
       <TabList onChange={handleValueChange} centered>
         <Tab label="Table of Processes" value="1" icon={<TableChartIcon />} iconPosition="start"/>
         <Tab label="System Information & Graphs" value="2" icon={<EqualizerIcon />} iconPosition="start"/>
+        {selectedRow && 
+        <Tab label="Selected Process Graphs" value="3" icon={<InsertChartIcon />} iconPosition="start"/>
+        }
       </TabList>
     </Box>
     <TabPanel value="1" style={{padding: 0, margin: 0}}>
@@ -154,6 +161,10 @@ function App() {
         rows={rows}
         pausedTableUpdate={pausedTableUpdate}
         setPausedTableUpdate={setPausedTableUpdate}
+        rowSelectionModel={rowSelectionModel}
+        setRowSelectionModel={setRowSelectionModel}
+        selectedRow={selectedRow}
+        setSelectedRow={setSelectedRow}
         />    
     </TabPanel>
     <TabPanel value="2">
@@ -163,6 +174,12 @@ function App() {
         cpuUsageDataBarChart={cpuUsageDataBarChart}
         memUsageDataLineGraph={memUsageDataLineGraph}
         memUsageDataPieChart={memUsageDataPieChart}
+      />
+    </TabPanel>
+    <TabPanel value="3">
+      <ProcessInfo
+        selectedRow={selectedRow}
+        rows={rows}
       />
     </TabPanel>
   </TabContext>

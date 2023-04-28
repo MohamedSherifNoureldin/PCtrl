@@ -43,7 +43,11 @@ pub fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>,
         let idle = cpu.idle + cpu.iowait.unwrap_or(0);
         let totald = cpu_total as f64 - sys_stats._cpu_total as f64;
         let idled = idle as f64 - sys_stats._idle as f64;
-        cpus_usage.push( (totald - idled) as f32/ totald as f32);
+
+        // ((stat.utime+stat.stime)/ticks_per_second()) as f32  / (uptime as f32 - (stat.starttime/ticks_per_second()) as f32)
+        cpus_usage.push( 1- (idled) as f32/ totald as f32);
+        //cpus_usage.push( (totald - idled) as f32/ totald as f32);
+        
         sys_stats._idle = idle;
         cpu_count += 1;
     }

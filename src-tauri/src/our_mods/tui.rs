@@ -3,14 +3,14 @@ use std::collections::LinkedList;
 use std::vec::Vec;
 use std::collections::HashMap;
 
-use chrono::{DateTime, Local};
+use chrono::{DateTime};
 use std::num::NonZeroU32;
 
 // cursive TUI imports
 use cursive::Cursive;
 use cursive::theme::{Color, PaletteColor, Theme, BorderStyle};
 use cursive::views::{Dialog, TextView, LinearLayout, EditView, DummyView, SelectView};
-use cursive_table_view::{TableView, TableViewItem };
+use cursive_table_view::{TableView};
 use cursive_tree_view::{Placement, TreeView};
 use cursive::CursiveExt;
 use cursive::align::HAlign;

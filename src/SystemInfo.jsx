@@ -7,13 +7,12 @@ import * as React from 'react';
 import Grid from '@mui/material/Unstable_Grid2'; // Grid version 2
 import randomColor from 'randomcolor';
 
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Sector, BarChart, Bar, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 
 
-function SystemInfo({systeminfo, cpuUsageData}) 
+function SystemInfo({systeminfo, cpuUsageDataLineGraph, cpuUsageDataBarChart, memUsageDataLineGraph, memUsageDataPieChart}) 
 {    
-    // const colors = Array.from({ length: 60 }, () => randomColor());
     const colors = 
     [
         "#e2a461", "#95cced", "#1bc464", "#cf1df7", "#efb7ac", "#d3443d", "#f95d52", "#3aef37", "#3056dd", "#bdef58", "#d18504", "#8bedb9", "#9ffceb", "#2cd369", "#8becf4", "#f4a79a",
@@ -21,7 +20,6 @@ function SystemInfo({systeminfo, cpuUsageData})
         "#ed82e9","#dac0f7","#e881af","#ed1c31","#ebf271","#ef1fc9","#118409","#52a0b7","#ffe399","#6cd873","#8cd6db","#f9c0f0","#ce755a","#a7f4a1","#11dd2c","#afe3ed","#f4b7f2",
         "#9edded","#a8a1f4","#d15df4","#f9f4a9","#ef0792","#58a7b7","#75db08","#5b249e","#671299","#abfcdd",
     ]
-    console.log(colors);
     return (
         <Box>
             <Divider style={{paddingBottom: 15}}>
@@ -73,34 +71,131 @@ function SystemInfo({systeminfo, cpuUsageData})
                 <Chip label="CPU Graphs" />
             </Divider>
 
-            <LineChart
-            width={500}
-            height={300}
-            data={cpuUsageData}
-            margin={{
-                top: 5,
-                right: 30,
-                left: 20,
-                bottom: 5,
-            }}
-            >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                {Array.from({ length: systeminfo.cpu_cores_num }).map((_, index) => (
-                    <Line
-                    connectNulls
-                    type="monotone"
-                    dataKey={`core${index + 1}`}
-                    stroke={colors[index]}
-                    />
-                ))}
-                {/* <Line type="monotone" dataKey="core1" stroke="#8884d8" />
-                <Line type="monotone" dataKey="core2" stroke="#82ca9d" /> */}
-            </LineChart>
+            <Grid container rowSpacing={1} columnSpacing={2}>
+                <Grid xs={6}>
+                <ResponsiveContainer width="100%" height="100%" minHeight={300} minWidth={500}>
+                    <LineChart
+                    width={500}
+                    height={300}
+                    data={cpuUsageDataLineGraph}
+                    margin={{
+                        top: 5,
+                        right: 30,
+                        left: 20,
+                        bottom: 5,
+                    }}
+                    >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" />
+                        <YAxis />
+                        <Tooltip />
+                        <Legend />
+                        {Array.from({ length: systeminfo.cpu_cores_num }).map((_, index) => (
+                            <Line
+                            key={`line-${index}`}
+                            connectNulls
+                            type="monotone"
+                            dataKey={`core${index + 1}`}
+                            stroke={colors[index]}
+                            />
+                        ))}
+                    </LineChart>
+                </ResponsiveContainer>
+                </Grid>
 
+                <Grid xs={6}>
+                    <ResponsiveContainer width="100%" height="100%" minHeight={300} minWidth={500}>
+                        <BarChart
+                        width={500}
+                        height={300}
+                        data={cpuUsageDataBarChart}
+                        margin={{
+                            top: 5,
+                            right: 30,
+                            left: 20,
+                            bottom: 5,
+                        }}
+                        >
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="core" />
+                            <YAxis />
+                            <Tooltip />
+                            <Legend />
+                            <Bar
+                                type="monotone"
+                                dataKey="usage"
+                                fill={colors[2]}
+                            >
+                            {cpuUsageDataBarChart.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={colors[index]} />
+                            ))}
+                            </Bar>
+
+
+                        </BarChart>
+                    </ResponsiveContainer>
+                </Grid>
+            </Grid>
+
+            <Divider style={{padding: 15}}>
+                <Chip label="Memory Graphs" />
+            </Divider>
+            <Grid container rowSpacing={1} columnSpacing={2}>
+                <Grid xs={6}>
+                    <ResponsiveContainer width="100%" height="100%" minHeight={300} minWidth={500}>
+                        <LineChart
+                        width={500}
+                        height={300}
+                        data={memUsageDataLineGraph}
+                        margin={{
+                            top: 5,
+                            right: 30,
+                            left: 20,
+                            bottom: 5,
+                        }}
+                        >
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="name" />
+                            <YAxis />
+                            <Tooltip />
+                            <Legend />
+
+                            <Line
+                            connectNulls
+                            type="monotone"
+                            dataKey="mem_usage"
+                            stroke={colors[0]}
+                            />
+                            <Line
+                            connectNulls
+                            type="monotone"
+                            dataKey="swap_usage"
+                            stroke={colors[1]}
+                            />
+                        </LineChart>
+                    </ResponsiveContainer>
+                </Grid>
+                <Grid xs={6}>
+                    <ResponsiveContainer width="100%" height="100%" minHeight={300} minWidth={500}>
+                        <PieChart width={500} height={300}>
+                            <Pie
+                            data={memUsageDataPieChart}
+                            cx="50%"
+                            cy="50%"
+                            outerRadius={100}
+                            fill="#8884d8"
+                            dataKey="mem_usage"
+                            label
+                            >
+                            {memUsageDataPieChart.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={colors[index]} />
+                            ))}
+                            </Pie>
+                            <Tooltip />
+                        </PieChart>
+                    </ResponsiveContainer>
+                </Grid>
+            </Grid>
         </Box>
     )
 }

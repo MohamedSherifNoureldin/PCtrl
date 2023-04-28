@@ -30,7 +30,7 @@ pub fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>,
     let mut proc_count:u32 = 0;
     let mut cpu_count: u8 = 0;
     let mut cpus_usage :Vec<f32> = Vec::new();
-    let mut cpu_total = 0;
+    let mut cpu_total:Vec<u64> = Vec::new();
     let uptime = procfs::Uptime::new().unwrap().uptime;
 
     let mut childcounts = 0;
@@ -38,17 +38,17 @@ pub fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>,
     for cpu in procfs::KernelStats::new().unwrap().cpu_time {
     	if sys_stats.cpu_hist.len() > 0 {
         }
-        cpu_total = cpu.user + cpu.nice + cpu.system + cpu.idle + cpu.iowait.unwrap_or(0) + cpu.irq.unwrap_or(0) + cpu.softirq.unwrap_or(0) + cpu.steal.unwrap_or(0);// + cpu.guest.unwrap_or(0) + cpu.guest_nice.unwrap_or(0);
+        cpu_total[cpu_count] = (cpu.user + cpu.nice + cpu.system + cpu.idle + cpu.iowait.unwrap_or(0) + cpu.irq.unwrap_or(0) + cpu.softirq.unwrap_or(0) + cpu.steal.unwrap_or(0)) / ticks_per_second();// + cpu.guest.unwrap_or(0) + cpu.guest_nice.unwrap_or(0);
         //100.0 * ((stat.utime+stat.stime) - _prev_duration) as f32 / (cpu_total - sys_stats._cpu_total) as f32 * cpu_count as f32
-        let idle = cpu.idle + cpu.iowait.unwrap_or(0);
-        let totald = cpu_total as f64 - sys_stats._cpu_total as f64;
-        let idled = idle as f64 - sys_stats._idle as f64;
+        let idle = ((cpu.idle + cpu.iowait.unwrap_or(0)) / ticks_per_second()) as f64;
+        let totald = cpu_total[cpu_count] as f64 - sys_stats._cpu_total[cpu_count] as f64;
+        let idled = (idle - sys_stats._idle[cpu_count] / ticks_per_second()) as f64;
 
         // ((stat.utime+stat.stime)/ticks_per_second()) as f32  / (uptime as f32 - (stat.starttime/ticks_per_second()) as f32)
-        cpus_usage.push( 1- (idled) as f32/ totald as f32);
+        cpus_usage.push( (1.0 - idled/ totald)  * 100.0);
         //cpus_usage.push( (totald - idled) as f32/ totald as f32);
         
-        sys_stats._idle = idle;
+        sys_stats._idle[cpu_count] = idle;
         cpu_count += 1;
     }
     let mut last_read : u32 = 1;

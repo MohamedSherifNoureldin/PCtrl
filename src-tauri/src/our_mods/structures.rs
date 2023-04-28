@@ -78,8 +78,8 @@ pub_struct! (SysStats {
     net_hist:  LinkedList<u32>, // change type according to units
     swap_hist:  LinkedList<u16>,
 
-    _cpu_total: u64,
-    _idle: u64,
+    _cpu_total: Vec<f64>,
+    _idle: Vec<f64>,
 });
 
 // structure for holding the user's configuration data

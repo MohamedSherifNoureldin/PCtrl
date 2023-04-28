@@ -1,1 +1,0 @@
-export const gridRowsMetaSelector = state => state.rowsMeta;

@@ -1,1 +1,0 @@
-export const gridPreferencePanelStateSelector = state => state.preferencePanel;

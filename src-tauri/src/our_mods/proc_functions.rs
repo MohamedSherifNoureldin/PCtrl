@@ -28,6 +28,16 @@ fn log_data<T>(list: &mut LinkedList<T>, val:T, config: Config) {
 
 }
 
+macro_rules! min {
+    ($a:expr, $b:expr, $def:expr) => {
+        if $a > $b {
+            ($a - $b) as f32
+        } else {
+            $def
+        }
+    };
+}
+
 
 
 pub fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys_stats: &mut SysStats, config: Config) {
@@ -51,7 +61,7 @@ pub fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>,
     let mut childcounts = 0;
 
 
-    sys_stats._idle.clear();
+    //sys_stats._idle.clear();
 
     let kstat = procfs::KernelStats::new().unwrap();
     let cputime = kstat.cpu_time;
@@ -63,35 +73,48 @@ pub fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>,
         
         //100.0 * ((stat.utime+stat.stime) - _prev_duration) as f32 / (cpu_total - sys_stats._cpu_total) as f32 * cpu_count as f32
 
-        let idle:f64 = ((cpu.idle + cpu.iowait.unwrap_or(0)) / ticks_per_second()) as f64;
-        let _cputot = ((cpu.user + cpu.nice + cpu.system + cpu.idle + cpu.iowait.unwrap_or(0) + cpu.irq.unwrap_or(0) + cpu.softirq.unwrap_or(0) + cpu.steal.unwrap_or(0)) / ticks_per_second()) as f64;
+        let idle = ((cpu.idle + cpu.iowait.unwrap_or(0)) ) ;
+        let _cputot = ((cpu.user + cpu.nice + cpu.system + cpu.idle + cpu.iowait.unwrap_or(0) + cpu.irq.unwrap_or(0) + cpu.softirq.unwrap_or(0) + cpu.steal.unwrap_or(0) + cpu.guest.unwrap_or(0) + cpu.guest_nice.unwrap_or(0)) ) ;
+        let work = cpu.user + cpu.nice + cpu.system + cpu.irq.unwrap_or(0) + cpu.softirq.unwrap_or(0);
+        let mut var;
+        if sys_stats._cpu_total.len() <= (cpu_count) as usize || cpu_count == 0 {
+            var = 0;
+        }
+        else {
+            var = sys_stats._cpu_total[(cpu_count) as usize];
+        }
+         let mut var1;
+        if sys_stats._idle.len() <= cpu_count as usize || cpu_count == 0 {
+            var1 = 0;
+        }
+        else {
+            var1 = sys_stats._idle[(cpu_count) as usize];
+        }
+        let totald = min!(_cputot, var, 0.0) as f64;
 
-        // let mut var;
-        // if sys_stats._cpu_total.len() <= (cpu_count as i32-1) as usize || cpu_count == 0 {
-        //     var = 0 as f64;
-        // }
-        // else {
-        //     var = sys_stats._cpu_total[(cpu_count-1) as usize];
-        // }
-         //let mut var1;
-        // if sys_stats._idle.len() <= (cpu_count as i32 -1) as usize || cpu_count == 0 {
-        //     var1 = 0 as f64;
-        // }
-        // else {
-        //     var1 = sys_stats._idle[(cpu_count-1) as usize];
-        // }
-        //let totald = _cputot as f64 - var as f64;
-
-        //let idled = (idle - (var1 / ticks_per_second() as f64)) as f64;
+        // let idled = (idle - (var1 / ticks_per_second() as f64)) as f64;
+        let workd = min!(work, var1, 0.0) as f64;
 
 
 
         // ((stat.utime+stat.stime)/ticks_per_second()) as f32  / (uptime as f32 - (stat.starttime/ticks_per_second()) as f32)
-        sys_stats._idle.push(idle);
-        cpu_total.push(_cputot);
-        cpus_usage.push( ((1.0 - (idle / _cputot)) * 100.0) as f32);
+        
+        if sys_stats._cpu_total.len() <= (cpu_count) as usize || cpu_count == 0 {
+            sys_stats._cpu_total.push(_cputot);
+        }
+        else {
+            sys_stats._cpu_total[cpu_count as usize] = (_cputot);
+        }
+        if sys_stats._idle.len() <= cpu_count as usize || cpu_count == 0 {
+            sys_stats._idle.push(idle);
+        }
+        else {
+            sys_stats._idle[cpu_count as usize] = (work);
+        }
+        //cpu_total.push(_cputot);
+        cpus_usage.push( (((workd / totald)) * 100.0) as f32);
         //println!("cputotal: {}", _cputot);
-        //println!("usage: {}", cpus_usage[cpu_count as usize]);
+        println!("usage: {}", cpus_usage[cpu_count as usize]);
         //println!("idle: {}", idle);
         //println!("idled: {}", idled);
         //println!("totald: {}", totald);
@@ -412,7 +435,7 @@ pub fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>,
     let model_name = cpuinfo.lines().find(|line| line.starts_with("model name")).unwrap_or_default();
     let model_name = model_name.split(":").nth(1).unwrap_or_default().trim();
     sys_stats.cpu_name = (*model_name).to_string();
-    sys_stats._cpu_total = cpu_total;
+    //sys_stats._cpu_total = cpu_total;
 }
 
 pub fn record_prc(procs: &mut Vec<Process>, pid_table: &mut HashMap<u32, u16>, pid: u32, recording_procs: Vec<u32>, config: &mut Config) { // recordings exist in "/usr/local/pctrl/", process record format is plog

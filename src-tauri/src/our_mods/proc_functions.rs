@@ -83,8 +83,14 @@ pub fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>,
         //100.0 * ((stat.utime+stat.stime) - _prev_duration) as f32 / (cpu_total - sys_stats._cpu_total) as f32 * cpu_count as f32
 
         let idle:f64 = ((cpu.idle + cpu.iowait.unwrap_or(0)) / ticks_per_second()) as f64;
-
-        let totald = cpu_total[cpu_count as usize] as f64 - sys_stats._cpu_total[cpu_count as usize] as f64;
+        let mut var;
+        if sys_stats._cpu_total.len() <= cpu_count as usize {
+            var = 0;
+        }
+        else {
+            var = sys_stats._cpu_total[cpu_count as usize];
+        }
+        let totald = cpu_total[cpu_count as usize] as f64 - var as f64;
 
         let idled = (idle - sys_stats._idle[cpu_count as usize] / ticks_per_second() as f64) as f64;
 

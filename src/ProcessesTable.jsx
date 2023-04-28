@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import reactLogo from "./assets/react.svg";
 import { invoke } from "@tauri-apps/api/tauri";
 
 import * as React from 'react';
@@ -131,6 +132,9 @@ function ProcessesTable({rows, pausedTableUpdate, setPausedTableUpdate, selected
           
         />
         <div style={{ display: 'flex', justifyContent: "space-between" }}>
+          <Button variant="contained" size="large" startIcon={pausedTableUpdate?<PlayArrowIcon />:<PauseIcon />} onClick={() => setPausedTableUpdate(!pausedTableUpdate)}>
+            {pausedTableUpdate?'Resume Table Update':'Pause Table Update'}
+          </Button>
           {selectedRow && (
           <ButtonGroup
             color="primary"
@@ -146,9 +150,6 @@ function ProcessesTable({rows, pausedTableUpdate, setPausedTableUpdate, selected
             <Button onClick={resumeProcess} startIcon={<PlayArrowIcon />}>Resume Process</Button>
           </ButtonGroup>
           )}
-          <Button variant="contained" size="large" startIcon={pausedTableUpdate?<PlayArrowIcon />:<PauseIcon />} onClick={() => setPausedTableUpdate(!pausedTableUpdate)}>
-            {pausedTableUpdate?'Resume Table Update':'Pause Table Update'}
-          </Button>
         </div>
     </Box>
     )

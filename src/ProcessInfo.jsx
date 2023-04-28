@@ -43,7 +43,7 @@ function ProcessInfo({rows, selectedRow}) {
         // cpu usage line graph data
         const cpuUsageDataLineGraph = actualProcessInfo.cpu_hist.map((data, index) => {
             return {
-                name: `${index + 1}st second`,
+                name: (index==0)?'1 sec':`${index + 1} secs`,
                 cpu_usage: (data*100).toFixed(4),
             };
         });
@@ -53,7 +53,7 @@ function ProcessInfo({rows, selectedRow}) {
         // mem usage line graph data
         const memUsageDataLineGraph = actualProcessInfo.ram_hist.map((data, index) => {
         return {
-            name: `${index + 1}st second`,
+            name: (index==0)?'1 sec':`${index + 1} secs`,
             mem_usage: data,
             swap_usage: actualProcessInfo.swap_hist[index],
         };

@@ -63,11 +63,16 @@ function App() {
               acc[`core${coreIndex + 1}`] = val;
               return acc;
             }, {});
-          
-            return {
-              name: `${index + 1}st second`,
-              ...cores,
-            };
+            if(index === 0)
+              return {
+                name: "1 sec",
+                ...cores,
+              }
+            else 
+              return {
+                name: `${index + 1} secs`,
+                ...cores,
+              };
           });
           setCpuUsageDataLineGraph(cpuUsageDataLineGraph);
   
@@ -84,7 +89,7 @@ function App() {
           // mem usage line graph data
           const memUsageDataLineGraph = systemRes.ram_hist.map((data, index) => {
             return {
-              name: `${index + 1}st second`,
+              name: (index==0)?'1 sec':`${index + 1} secs`,
               mem_usage: data,
               swap_usage: systemRes.swap_hist[index],
             };

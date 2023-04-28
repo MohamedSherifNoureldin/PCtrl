@@ -40,9 +40,13 @@
       {
         "fullscreen": false,
         "resizable": true,
-        "title": "lpm",
-        "width": 800,
-        "height": 600
+        "center": true,
+        "maximized": true,
+        "title": "Linux Process Manager",
+        "width": 1200,
+        "height": 1000,
+        "minWidth": 1200,
+        "minHeight": 1000
       }
     ]
   }

@@ -23,7 +23,7 @@ function SystemInfo({systeminfo, cpuUsageDataLineGraph, cpuUsageDataBarChart, me
     return (
         <Box>
             <Divider style={{paddingBottom: 15}}>
-                <Chip label="General Info" />
+                <Chip label="General Info" style={{width: 200}}/>
             </Divider>
             <Grid container rowSpacing={1} columnSpacing={2}>
                 <Grid xs={6}>
@@ -35,7 +35,7 @@ function SystemInfo({systeminfo, cpuUsageDataLineGraph, cpuUsageDataBarChart, me
             </Grid>  
 
             <Divider style={{padding: 15}}>
-                <Chip label="CPU" />
+                <Chip label="CPU" style={{width: 200}}/>
             </Divider>
             <Grid container rowSpacing={1} columnSpacing={2}>
                 <Grid xs={6}>
@@ -53,7 +53,7 @@ function SystemInfo({systeminfo, cpuUsageDataLineGraph, cpuUsageDataBarChart, me
             </Grid>  
 
             <Divider style={{padding: 15}}>
-                <Chip label="Memory" />
+                <Chip label="Memory" style={{width: 200}}/>
             </Divider>
             <Grid container rowSpacing={1} columnSpacing={2}>
                 <Grid xs={4}>
@@ -68,7 +68,7 @@ function SystemInfo({systeminfo, cpuUsageDataLineGraph, cpuUsageDataBarChart, me
             </Grid>  
 
             <Divider style={{padding: 15}}>
-                <Chip label="CPU Graphs" />
+                <Chip label="CPU Graphs" style={{width: 200}}/>
             </Divider>
 
             <Grid container rowSpacing={1} columnSpacing={2}>
@@ -86,8 +86,8 @@ function SystemInfo({systeminfo, cpuUsageDataLineGraph, cpuUsageDataBarChart, me
                     }}
                     >
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" />
-                        <YAxis />
+                        <XAxis dataKey="name"/>
+                        <YAxis unit="%"/>
                         <Tooltip />
                         <Legend />
                         {Array.from({ length: systeminfo.cpu_cores_num }).map((_, index) => (
@@ -118,9 +118,8 @@ function SystemInfo({systeminfo, cpuUsageDataLineGraph, cpuUsageDataBarChart, me
                         >
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis dataKey="core" />
-                            <YAxis />
+                            <YAxis unit="%"/>
                             <Tooltip />
-                            <Legend />
                             <Bar
                                 type="monotone"
                                 dataKey="usage"
@@ -138,7 +137,7 @@ function SystemInfo({systeminfo, cpuUsageDataLineGraph, cpuUsageDataBarChart, me
             </Grid>
 
             <Divider style={{padding: 15}}>
-                <Chip label="Memory Graphs" />
+                <Chip label="Memory Graphs" style={{width: 200}}/>
             </Divider>
             <Grid container rowSpacing={1} columnSpacing={2}>
                 <Grid xs={6}>
@@ -156,7 +155,7 @@ function SystemInfo({systeminfo, cpuUsageDataLineGraph, cpuUsageDataBarChart, me
                         >
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis dataKey="name" />
-                            <YAxis />
+                            <YAxis unit="MB"/>
                             <Tooltip />
                             <Legend />
 
@@ -188,7 +187,7 @@ function SystemInfo({systeminfo, cpuUsageDataLineGraph, cpuUsageDataBarChart, me
                             label
                             >
                             {memUsageDataPieChart.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={colors[index]} />
+                                <Cell key={`cell-${index}`} fill={colors[index]}/>
                             ))}
                             </Pie>
                             <Tooltip />

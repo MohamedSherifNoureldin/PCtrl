@@ -84,43 +84,46 @@ function App() {
           };
         });
         setMemUsageDataLineGraph(memUsageDataLineGraph);
+
+        // mem usage pie chart data
+        const totalMemUsage = {};
+        let otherProcessesMemUsage = 0;
+        let totalUsedMemory = 0;
+        rows.forEach((process) => {
+          const processName = process.name;
+          const ramHist = process.ram_hist;
+          const memUsage = ramHist[0]*100/systemInfo.mem_total;
+
+          // If the process's memory usage is greater than 5%, add it to the total memory usage object
+          if (memUsage > 5) {
+            totalMemUsage[processName] = memUsage;
+          }
+          // If the process's memory usage is less than or equal to 5%, add it to the total memory usage of other processes
+          if (memUsage <= 5) {
+            otherProcessesMemUsage += memUsage;
+          }
+          totalUsedMemory += memUsage;
+        });
+
+        // Add the total memory usage of other processes to the total memory usage object
+        if (otherProcessesMemUsage > 0) {
+          totalMemUsage['Other Processes'] = otherProcessesMemUsage;
+        }
+
+        // Add the total memory usage of the system to the total memory usage object
+        totalMemUsage['Free Memory'] = 100 - totalUsedMemory;
+        console.log(totalMemUsage);
+        console.log(totalUsedMemory);
+
+        // Convert the total memory usage object to an array of objects with the desired format
+        const memUsageDataPieChart = Object.keys(totalMemUsage).map((processName) => ({
+          name: processName,
+          mem_usage: totalMemUsage[processName],
+        }));
+
+        setMemUsageDataPieChart(memUsageDataPieChart);
       })
 
-      // mem usage pie chart data
-      const totalMemUsage = {};
-      let otherProcessesMemUsage = 0;
-      let totalUsedMemory = 0;
-      rows.forEach((process) => {
-        const processName = process.name;
-        const ramHist = process.ram_hist;
-        const memUsage = ramHist[0]*100/systemInfo.mem_total;
-
-        // If the process's memory usage is greater than 5%, add it to the total memory usage object
-        if (memUsage > 5) {
-          totalMemUsage[processName] = memUsage;
-        }
-        // If the process's memory usage is less than or equal to 5%, add it to the total memory usage of other processes
-        if (memUsage <= 5) {
-          otherProcessesMemUsage += memUsage;
-        }
-        totalUsedMemory += memUsage;
-      });
-
-      // Add the total memory usage of other processes to the total memory usage object
-      if (otherProcessesMemUsage > 0) {
-        totalMemUsage['Other Processes'] = otherProcessesMemUsage;
-      }
-
-      // Add the total memory usage of the system to the total memory usage object
-      totalMemUsage['Free Memory'] = 100 - totalUsedMemory;
-
-      // Convert the total memory usage object to an array of objects with the desired format
-      const memUsageDataPieChart = Object.keys(totalMemUsage).map((processName) => ({
-        name: processName,
-        mem_usage: totalMemUsage[processName],
-      }));
-
-      setMemUsageDataPieChart(memUsageDataPieChart);
       console.log(memUsageDataPieChart);
 
       console.log("Updated Processes")

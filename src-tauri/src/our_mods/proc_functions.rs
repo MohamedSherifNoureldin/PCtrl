@@ -114,7 +114,7 @@ pub fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>,
         //cpu_total.push(_cputot);
         cpus_usage.push( (((workd / totald)) * 100.0) as f32);
         //println!("cputotal: {}", _cputot);
-        println!("usage: {}", cpus_usage[cpu_count as usize]);
+        //println!("usage: {}", cpus_usage[cpu_count as usize]);
         //println!("idle: {}", idle);
         //println!("idled: {}", idled);
         //println!("totald: {}", totald);

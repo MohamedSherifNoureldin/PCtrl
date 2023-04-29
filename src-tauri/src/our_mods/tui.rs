@@ -22,7 +22,7 @@ extern crate cursive_table_view;
 use super::structures::*;
 use super::proc_functions::*;
 
-static mut SHOW_TREE: bool = true;
+static mut SHOW_TREE: bool = false;
 static mut tree_open: bool = false;
 
 // function to update the table view in the TUI
@@ -90,7 +90,7 @@ pub fn display_tui(columns_to_display: Vec<String>) {
     }
 
     let mut siv = Cursive::default();
-    unsafe { SHOW_TREE = true; }
+    //unsafe { SHOW_TREE = true; }
     let theme = custom_theme_from_cursive(&siv);
     siv.set_theme(theme);
 
@@ -129,7 +129,7 @@ pub fn display_tui(columns_to_display: Vec<String>) {
                 "STARTTIME" => table = table.column(BasicColumn::STARTTIME, "STARTED", |c| c.align(HAlign::Left).width_percent(12)),
                 "FD" => table = table.column(BasicColumn::FD, "FD", |c| c.align(HAlign::Left).width(7).ordering(Ordering::Greater)),
                 "OWNER" => table = table.column(BasicColumn::OWNER, "OWNER", |c| c.align(HAlign::Left).width_percent(9)),
-                "CMD" => table = table.column(BasicColumn::CMD, "CMD - Tree", |c| c.align(HAlign::Left)),
+                "CMD" => table = table.column(BasicColumn::CMD, "CMD", |c| c.align(HAlign::Left)),
                 _ => { println!("Invalid column name: {}", col_name); }
             }
         }
@@ -268,6 +268,10 @@ pub fn display_tui(columns_to_display: Vec<String>) {
                     .title("Process Tree")
                     .button("Close", |s| {
                         s.pop_layer();
+                        unsafe {
+                            tree_open = false;
+                            SHOW_TREE = false;
+                        }
                     }),
             );
         }
@@ -390,7 +394,7 @@ pub fn display_tui(columns_to_display: Vec<String>) {
     siv.add_global_callback(cursive::event::Event::CtrlChar('s'), |siv|{
         match saveConfig() {
             Ok(_) => {},
-            Err(e) => {
+            Err(_e) => {
                 siv.add_layer(Dialog::text("Failed to Save Configuration").title("Failed to Save Configuration File").button("Ok", |s| {
                     s.pop_layer();
                 }));
@@ -671,3 +675,4 @@ pub fn filter_process(procs: &mut Vec<Process>) -> Vec<Process> {
     //unsafe{ println!("PROC: {}", _PROCESSES.len().clone());}
     filtered_procs
 }
+

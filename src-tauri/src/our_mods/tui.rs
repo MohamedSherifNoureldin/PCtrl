@@ -23,6 +23,7 @@ use super::structures::*;
 use super::proc_functions::*;
 
 static mut SHOW_TREE: bool = true;
+static mut tree_open: bool = false;
 
 // function to update the table view in the TUI
 fn update_views(siv: &mut Cursive, procs: &mut Vec<Process>, pid_table: &mut HashMap<u32, u16>, sys_stats: &mut SysStats, config: Config, counter: u32) {
@@ -128,7 +129,7 @@ pub fn display_tui(columns_to_display: Vec<String>) {
                 "STARTTIME" => table = table.column(BasicColumn::STARTTIME, "STARTED", |c| c.align(HAlign::Left).width_percent(12)),
                 "FD" => table = table.column(BasicColumn::FD, "FD", |c| c.align(HAlign::Left).width(7).ordering(Ordering::Greater)),
                 "OWNER" => table = table.column(BasicColumn::OWNER, "OWNER", |c| c.align(HAlign::Left).width_percent(9)),
-                "CMD" => table = table.column(BasicColumn::CMD, "CMD - Tree", |c| c.align(HAlign::Left).width_percent(25)),
+                "CMD" => table = table.column(BasicColumn::CMD, "CMD - Tree", |c| c.align(HAlign::Left)),
                 _ => { println!("Invalid column name: {}", col_name); }
             }
         }
@@ -186,7 +187,7 @@ pub fn display_tui(columns_to_display: Vec<String>) {
             )
             .child(Dialog::around(table.with_name("table").full_screen()).title("Processes"))
             .child(Dialog::around(LinearLayout::horizontal()
-            .child(TextView::new("Exit <q> - Pause/Unpause <space> - Kill <k> - Suspend/Resume <p>/<r> - Filter <s>/<ctrl+f> - Clear filters <c> - Save config <ctrl+s>").h_align(HAlign::Center))
+            .child(TextView::new("Exit <q> - Pause/Unpause <space> - Process Tree <t> - Kill <k> - Suspend/Resume <p>/<r> - Filter <s>/<ctrl+f> - Clear filters <c> - Save config <ctrl+s>").h_align(HAlign::Center))
             
         ).title("Controls"))
         .child(TextView::new("Status: Updating in realtime...").h_align(HAlign::Right).with_name("status").full_width())
@@ -218,6 +219,59 @@ pub fn display_tui(columns_to_display: Vec<String>) {
                     }),
             );
         }
+    });
+
+    siv.add_global_callback('t',   |s| {
+        if unsafe {tree_open} {
+            s.pop_layer();
+            unsafe{
+                tree_open = false;
+                SHOW_TREE = false;
+            }
+        }
+        else {
+            unsafe{
+                tree_open = true;
+                SHOW_TREE = true;
+            }
+            let mut pid = 0;
+            s.call_on_name("table", |view: &mut TableView<Process, BasicColumn>| {
+                let selected_row = view.item().unwrap() as usize;
+                let selected_item = view.borrow_item(selected_row).unwrap().clone();
+                pid = selected_item.pid;
+            });
+            let mut tree: TableView<Process, BasicColumn> = TableView::<Process, BasicColumn>::new();
+            let tree_procs = unsafe{filter_process(&mut _PROCESSES)};
+            let mut selindex = 0;
+            let mut i = 0;
+            for p in tree_procs.clone() {
+                if p.pid == pid {
+                    selindex = i;
+                    break;
+                }
+                i+=1;
+            }
+            tree.set_items(tree_procs);
+            tree = tree.column(BasicColumn::PID, "PID", |c| {
+                c.ordering(Ordering::Greater)
+                .align(HAlign::Right)
+                .width(7)
+            });
+            tree = tree.column(BasicColumn::CMD, "Tree", |c| c.ordering(Ordering::Less).align(HAlign::Left));
+            
+            tree.set_default_column(BasicColumn::CMD);
+            tree.set_selected_item(selindex);
+            
+            //tree.disable();
+            s.add_layer(
+                Dialog::around( tree.with_name("treetable").full_screen() )
+                    .title("Process Tree")
+                    .button("Close", |s| {
+                        s.pop_layer();
+                    }),
+            );
+        }
+        
     });
 
     // add a callback to pause process when user presses 'p' while selecting a row
@@ -617,4 +671,3 @@ pub fn filter_process(procs: &mut Vec<Process>) -> Vec<Process> {
     //unsafe{ println!("PROC: {}", _PROCESSES.len().clone());}
     filtered_procs
 }
-

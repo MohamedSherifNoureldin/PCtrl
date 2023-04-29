@@ -97,7 +97,7 @@ impl Config {
             record_length: 10,
             update_every : 1,
             max_rec_limit : 60000,
-            current_column : BasicColumn::CMD,
+            current_column : BasicColumn::PID,
         }
     }
 }

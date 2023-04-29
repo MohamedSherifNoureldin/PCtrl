@@ -43,6 +43,8 @@ function App() {
   // CPU
   const [cpuUsageDataLineGraph, setCpuUsageDataLineGraph] = useState([]);
   const [cpuUsageDataBarChart, setCpuUsageDataBarChart] = useState([]);
+  const [cpuUsageDataPieChart, setCpuUsageDataPieChart] = useState([]);
+
   // MEM
   const [memUsageDataLineGraph, setMemUsageDataLineGraph] = useState([]);
   const [memUsageDataPieChart, setMemUsageDataPieChart] = useState([]);
@@ -87,6 +89,44 @@ function App() {
             };
           });
           setCpuUsageDataBarChart(cpuUsageDataBarChart);
+
+          // cpu usage pie chart data
+          const totalCpuUsage = {};
+          let otherProcessesCpuUsage = 0;
+          let totalUsedCpu = 0;
+          procRes.forEach((process) => {
+            const processName = process.name;
+            const cpuHist = process.cpu_hist;
+            const cpuUsage = cpuHist[0]*100;
+
+            // If the process's cpu usage is greater than 5%, add it to the total cpu usage object
+            if (cpuUsage > 5) {
+              totalCpuUsage[processName] = cpuUsage;
+            }
+            // If the process's cpu usage is less than or equal to 5%, add it to the total cpu usage of other processes
+            if (cpuUsage <= 5) {
+              otherProcessesCpuUsage += cpuUsage;
+            }
+            totalUsedCpu += cpuUsage;
+          });
+
+          // Add the total cpu usage of other processes to the total cpu usage object
+          if (otherProcessesCpuUsage > 0) {
+            totalCpuUsage['Other Processes'] = otherProcessesCpuUsage;
+          }
+
+          // // Add the total cpu usage of the system to the total cpu usage object
+          // totalCpuUsage['Free CPU'] = 100 - totalUsedCpu;
+
+          // Convert the total cpu usage object to an array of objects with the desired format
+          const cpuUsageDataPieChart = Object.keys(totalCpuUsage).map((processName) => {
+            return {
+              name: processName,
+              cpu_usage: totalCpuUsage[processName],
+            };
+          });
+          console.log(cpuUsageDataPieChart)
+          setCpuUsageDataPieChart(cpuUsageDataPieChart);
   
           // mem
           // mem usage line graph data
@@ -185,6 +225,7 @@ function App() {
         systeminfo={systemInfo}
         cpuUsageDataLineGraph={cpuUsageDataLineGraph}
         cpuUsageDataBarChart={cpuUsageDataBarChart}
+        cpuUsageDataPieChart={cpuUsageDataPieChart}
         memUsageDataLineGraph={memUsageDataLineGraph}
         memUsageDataPieChart={memUsageDataPieChart}
       />

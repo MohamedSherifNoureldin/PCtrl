@@ -12,16 +12,16 @@ import { PieChart, Pie, Sector, BarChart, Bar, Cell, LineChart, Line, XAxis, YAx
 
 
 
-function SystemInfo({systeminfo, cpuUsageDataLineGraph, cpuUsageDataBarChart, memUsageDataLineGraph, memUsageDataPieChart}) 
+function SystemInfo({systeminfo, cpuUsageDataLineGraph, cpuUsageDataBarChart, cpuUsageDataPieChart, memUsageDataLineGraph, memUsageDataPieChart}) 
 {    
     const isSmallScreen = useMediaQuery((theme) => theme.breakpoints.down('md'));
 
     const colors = 
     [
-        "#e2a461", "#95cced", "#1bc464", "#cf1df7", "#efb7ac", "#d3443d", "#f95d52", "#3aef37", "#3056dd", "#bdef58", "#d18504", "#8bedb9", "#9ffceb", "#2cd369", "#8becf4", "#f4a79a",
-        "#63ff66","#4298b2","#b2ffbc","#b4e03a","#d16e4d","#0b3070","#35dd59","#c093d8","#c10359","#ed80ab","#77f75d","#7a50af","#acff63","#39d6b1","#393ff9","#0c34ad","#3ef2a1",
-        "#ed82e9","#dac0f7","#e881af","#ed1c31","#ebf271","#ef1fc9","#118409","#52a0b7","#ffe399","#6cd873","#8cd6db","#f9c0f0","#ce755a","#a7f4a1","#11dd2c","#afe3ed","#f4b7f2",
-        "#9edded","#a8a1f4","#d15df4","#f9f4a9","#ef0792","#58a7b7","#75db08","#5b249e","#671299","#abfcdd",
+        "#e2a461","#95cced","#1bc464","#cf1df7","#efb7ac","#d3443d","#f95d52","#3aef37","#3056dd","#bdef58","#d18504","#8bedb9","#9ffceb","#2cd369","#8becf4","#f4a79a","#63ff66",
+        "#4298b2","#b2ffbc","#b4e03a","#d16e4d","#0b3070","#35dd59","#c093d8","#c10359","#ed80ab","#77f75d","#7a50af","#acff63","#39d6b1","#393ff9","#0c34ad","#3ef2a1","#ed82e9",
+        "#dac0f7","#e881af","#ed1c31","#ebf271","#ef1fc9","#118409","#52a0b7","#ffe399","#6cd873","#8cd6db","#f9c0f0","#ce755a","#a7f4a1","#11dd2c","#afe3ed","#f4b7f2","#9edded",
+        "#a8a1f4","#d15df4","#f9f4a9","#ef0792","#58a7b7","#75db08","#5b249e","#671299","#abfcdd",
     ]
     return (
         <Box>
@@ -129,7 +129,7 @@ function SystemInfo({systeminfo, cpuUsageDataLineGraph, cpuUsageDataBarChart, me
                                 fill={colors[2]}
                             >
                             {cpuUsageDataBarChart.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={colors[index]} />
+                                <Cell key={`cell-${index}`} fill={colors[index%60]} />
                             ))}
                             </Bar>
 
@@ -137,6 +137,27 @@ function SystemInfo({systeminfo, cpuUsageDataLineGraph, cpuUsageDataBarChart, me
                         </BarChart>
                     </ResponsiveContainer>
                 </Grid>
+                <Grid xs={12}>
+                    <ResponsiveContainer width="100%" height="100%" minHeight={300} minWidth={500}>
+                        <PieChart width={500} height={300}>
+                            <Pie
+                            data={cpuUsageDataPieChart}
+                            cx="50%"
+                            cy="50%"
+                            outerRadius={100}
+                            fill="#8884d8"
+                            dataKey="cpu_usage"
+                            label
+                            >
+                            {cpuUsageDataPieChart.map((entry, index) => (
+                                <Cell key={`cell-${index}`} label={entry.process} fill={colors[index%60]}/>
+                            ))}
+                            </Pie>
+                            <Tooltip />
+                        </PieChart>
+                    </ResponsiveContainer>
+                </Grid>
+
             </Grid>
 
             <Divider style={{padding: 15}}>
@@ -190,7 +211,7 @@ function SystemInfo({systeminfo, cpuUsageDataLineGraph, cpuUsageDataBarChart, me
                             label
                             >
                             {memUsageDataPieChart.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={colors[index]}/>
+                                <Cell key={`cell-${index}`} fill={colors[index%60]}/>
                             ))}
                             </Pie>
                             <Tooltip />

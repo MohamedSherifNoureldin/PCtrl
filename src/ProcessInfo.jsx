@@ -37,8 +37,6 @@ function ProcessInfo({rows, selectedRow}) {
             }
         }
 
-        console.log(actualProcessInfo);
-
         // cpu
         // cpu usage line graph data
         const cpuUsageDataLineGraph = actualProcessInfo.cpu_hist.map((data, index) => {

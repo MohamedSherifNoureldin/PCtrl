@@ -618,7 +618,7 @@ pub fn keep_alive(_pid: u32) {
 }
 
 pub fn change_priority(pid: u32, priority: i32) -> bool {
-    let mut output;
+    let output;
     output = Command::new("renice")
         .arg(format!("{}", priority))
         .arg(format!("{}", pid))

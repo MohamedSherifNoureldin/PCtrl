@@ -16,6 +16,7 @@ import "./App.css";
 import EqualizerIcon from '@mui/icons-material/Equalizer';
 import TableChartIcon from '@mui/icons-material/TableChart';
 import InsertChartIcon from '@mui/icons-material/InsertChart';
+import AccountTreeIcon from '@mui/icons-material/AccountTree';
 
 //tabs
 import Tab from '@mui/material/Tab';
@@ -26,6 +27,8 @@ import TabPanel from '@mui/lab/TabPanel';
 import ProcessesTable from "./ProcessesTable";
 import SystemInfo from "./SystemInfo";
 import ProcessInfo from "./ProcessInfo";
+import ProcessesTree from "./ProcessesTree";
+
 
 function App() {
   const [rows, setRows] = useState([]);
@@ -44,6 +47,7 @@ function App() {
   const [memUsageDataLineGraph, setMemUsageDataLineGraph] = useState([]);
   const [memUsageDataPieChart, setMemUsageDataPieChart] = useState([]);
 
+  // tree
   const MINUTE_MS = 1000;
 
   useEffect(() => {
@@ -51,10 +55,9 @@ function App() {
       if(pausedTableUpdate) return;
       invoke("get_processes").then((procRes) => {
         setRows(procRes);
-        console.log(procRes);
+
         invoke("get_system_info").then((systemRes) => {
           setSystemInfo(systemRes);
-          console.log(systemRes);
           
           // cpu
           // cpu usage line graph data
@@ -135,7 +138,6 @@ function App() {
   
       });
 
-      console.log("Updated Processes")
     }, MINUTE_MS);
   
     return () => clearInterval(interval); // This represents the unmount function, in which you need to clear your interval to prevent memory leaks.
@@ -155,9 +157,10 @@ function App() {
     <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
       <TabList onChange={handleValueChange} centered>
         <Tab label="Table of Processes" value="1" icon={<TableChartIcon />} iconPosition="start"/>
-        <Tab label="System Information & Graphs" value="2" icon={<EqualizerIcon />} iconPosition="start"/>
+        <Tab label="Tree of Processes" value="2" icon={<AccountTreeIcon />} iconPosition="start"/>
+        <Tab label="System Information & Graphs" value="3" icon={<EqualizerIcon />} iconPosition="start"/>
         {selectedRow && 
-        <Tab label="Selected Process Graphs" value="3" icon={<InsertChartIcon />} iconPosition="start"/>
+        <Tab label="Selected Process Graphs" value="4" icon={<InsertChartIcon />} iconPosition="start"/>
         }
       </TabList>
     </Box>
@@ -173,6 +176,11 @@ function App() {
         />    
     </TabPanel>
     <TabPanel value="2">
+      <ProcessesTree
+        processes={rows}
+      />
+    </TabPanel>
+    <TabPanel value="3">
       <SystemInfo
         systeminfo={systemInfo}
         cpuUsageDataLineGraph={cpuUsageDataLineGraph}
@@ -181,7 +189,7 @@ function App() {
         memUsageDataPieChart={memUsageDataPieChart}
       />
     </TabPanel>
-    <TabPanel value="3">
+    <TabPanel value="4">
       <ProcessInfo
         selectedRow={selectedRow}
         rows={rows}

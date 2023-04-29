@@ -32,12 +32,12 @@ import Select from '@mui/material/Select';
 
 const columns = [
     { field: 'pid', headerName: 'PID', flex: 1 },
+    { field: 'parent_pid', headerName: 'PPID', flex: 1},
     { field: 'name', headerName: 'CMD', flex: 3 },
     { field: 'priority', headerName: 'PRI', flex: 1},
-    { field: 'parent_pid', headerName: 'PPID', flex: 1},
     { field: 'owner', headerName: 'OWNER', flex: 2},
     { field: 'state', headerName: 'STATE', flex: 2},
-    { field: 'open_fds', headerName: 'FD', flex: 1},
+    { field: 'open_fds', headerName: 'FD #', flex: 1},
     { field: 'start_time', headerName: 'STARTTIME',
       valueGetter: (params) => {
         const options = {

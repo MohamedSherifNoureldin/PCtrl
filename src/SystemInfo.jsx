@@ -7,7 +7,6 @@ import * as React from 'react';
 import Grid from '@mui/material/Unstable_Grid2'; // Grid version 2
 import randomColor from 'randomcolor';
 import { useMediaQuery } from '@mui/material';
-
 import { PieChart, Pie, Sector, BarChart, Bar, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 
@@ -100,6 +99,7 @@ function SystemInfo({systeminfo, cpuUsageDataLineGraph, cpuUsageDataBarChart, cp
                             type="monotone"
                             dataKey={`core${index + 1}`}
                             stroke={colors[index]}
+                            isAnimationActive={false}
                             />
                         ))}
                     </LineChart>
@@ -127,6 +127,7 @@ function SystemInfo({systeminfo, cpuUsageDataLineGraph, cpuUsageDataBarChart, cp
                                 type="monotone"
                                 dataKey="usage"
                                 fill={colors[2]}
+                                isAnimationActive={false}
                             >
                             {cpuUsageDataBarChart.map((entry, index) => (
                                 <Cell key={`cell-${index}`} fill={colors[index%60]} />

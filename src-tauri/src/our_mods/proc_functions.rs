@@ -153,59 +153,31 @@ pub fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>,
 
 
         let mut cmd: String = String::new();
-
         for entry in prc.cmdline().unwrap() {
-
             cmd.push_str(&format!("{} ", entry));
-
         }
-
             
-
         if proc_count as usize > procs.len() {
-
             i = procs.len();
-
             let newproc : Process = Process::default();
-
             procs.push(newproc);
-
         }
-
         else {
-
             i = proc_count as usize - 1;
-
-            if procs[i].name != stat.comm && procs[i].name != cmd { // proc has been replaced -> clear all history while updating
-
+            if procs[i].pid != stat.pid { // proc has been replaced -> clear all history while updating
                 procs[i].cpu_hist.clear();
-
                 procs[i].ram_hist.clear();
-
                 procs[i].disk_hist.clear();
-
                 procs[i].net_hist.clear();
-
             }
-
             procs[i].children.clear();
-
         }
-
-
 
         if i >= procs.len() { continue }
-
         pid_table.insert(stat.pid as u32, i as u16);
-
-        
-
         // Read Proc data
-
         procs[i].state = format!("{:?}",stat.state().unwrap());
-
         //procs[i].name = stat.comm;
-
         
 
         

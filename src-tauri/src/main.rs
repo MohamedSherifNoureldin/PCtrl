@@ -30,7 +30,7 @@ fn main() {
                 .value_delimiter(',')
                 .value_name("COLUMN_LIST")
                 .help("Comma-separated list of columns to display, in the order they should appear")
-                .default_value("PID,CMD,PRI,CPU,MEM,OWNER,STATE,STARTTIME,FD")
+                .default_value("PID,PPID,CMD,PRI,CPU,MEM,OWNER,STATE,STARTTIME,FD")
                 .value_parser(["PID", "PPID", "CMD", "PRI", "CPU", "MEM", "OWNER","STATE", "STARTTIME", "FD"])
                 .action(ArgAction::Append),
         )

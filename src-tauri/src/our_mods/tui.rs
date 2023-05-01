@@ -139,12 +139,12 @@ pub fn display_tui(columns_to_display: Vec<String>) {
     // Detect clicks on column headers
     //let mut booltest: &'static bool = &true;
     table.set_on_sort( move |siv: &mut Cursive, column: BasicColumn, order: Ordering| {  
-         if (column == BasicColumn::CMD) {
-            unsafe {SHOW_TREE = true;}
-         }
-        else {
-            unsafe {SHOW_TREE = false;}
-        }
+        //  if (column == BasicColumn::CMD) {
+        //     unsafe {SHOW_TREE = true;}
+        //  }
+        // else {
+        //     unsafe {SHOW_TREE = false;}
+        // }
         unsafe {
             update_views(siv, &mut _PROCESSES, &mut _PID_TABLE, &mut _SYS_STATS, *_CONFIG,counter);
             _CONFIG.current_column = column;

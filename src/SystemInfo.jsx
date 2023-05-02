@@ -99,7 +99,7 @@ function SystemInfo({systeminfo, cpuUsageDataLineGraph, cpuUsageDataBarChart, cp
                             type="monotone"
                             dataKey={`core${index + 1}`}
                             stroke={colors[index]}
-                            isAnimationActive={false}
+                            //isAnimationActive={false}
                             />
                         ))}
                     </LineChart>
@@ -127,7 +127,7 @@ function SystemInfo({systeminfo, cpuUsageDataLineGraph, cpuUsageDataBarChart, cp
                                 type="monotone"
                                 dataKey="usage"
                                 fill={colors[2]}
-                                isAnimationActive={false}
+                                //isAnimationActive={false}
                             >
                             {cpuUsageDataBarChart.map((entry, index) => (
                                 <Cell key={`cell-${index}`} fill={colors[index%60]} />
@@ -148,6 +148,7 @@ function SystemInfo({systeminfo, cpuUsageDataLineGraph, cpuUsageDataBarChart, cp
                             outerRadius={100}
                             fill="#8884d8"
                             dataKey="cpu_usage"
+                            //isAnimationActive={false}
                             label
                             >
                             {cpuUsageDataPieChart.map((entry, index) => (
@@ -189,12 +190,14 @@ function SystemInfo({systeminfo, cpuUsageDataLineGraph, cpuUsageDataBarChart, cp
                             type="monotone"
                             dataKey="mem_usage"
                             stroke={colors[0]}
+                            //isAnimationActive={false}
                             />
                             <Line
                             connectNulls
                             type="monotone"
                             dataKey="swap_usage"
                             stroke={colors[1]}
+                            //isAnimationActive={false}
                             />
                         </LineChart>
                     </ResponsiveContainer>
@@ -210,6 +213,7 @@ function SystemInfo({systeminfo, cpuUsageDataLineGraph, cpuUsageDataBarChart, cp
                             fill="#8884d8"
                             dataKey="mem_usage"
                             label
+                            //isAnimationActive={false}
                             >
                             {memUsageDataPieChart.map((entry, index) => (
                                 <Cell key={`cell-${index}`} fill={colors[index%60]}/>

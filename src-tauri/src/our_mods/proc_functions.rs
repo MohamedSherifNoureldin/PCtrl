@@ -164,7 +164,7 @@ pub fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>,
         }
         else {
             i = proc_count as usize - 1;
-            if procs[i].pid != stat.pid { // proc has been replaced -> clear all history while updating
+            if procs[i].pid != stat.pid as u32 { // proc has been replaced -> clear all history while updating
                 procs[i].cpu_hist.clear();
                 procs[i].ram_hist.clear();
                 procs[i].disk_hist.clear();

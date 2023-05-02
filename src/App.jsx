@@ -116,7 +116,7 @@ function App() {
           }
 
           // // Add the total cpu usage of the system to the total cpu usage object
-          // totalCpuUsage['Free CPU'] = 100 - totalUsedCpu;
+          totalCpuUsage['Free CPU'] = 100 - totalUsedCpu;
 
           // Convert the total cpu usage object to an array of objects with the desired format
           const cpuUsageDataPieChart = Object.keys(totalCpuUsage).map((processName) => {

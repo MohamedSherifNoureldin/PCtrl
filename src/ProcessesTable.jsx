@@ -1,13 +1,9 @@
 import { useState, useEffect } from "react";
-import reactLogo from "./assets/react.svg";
 import { invoke } from "@tauri-apps/api/tauri";
 
 import * as React from 'react';
 import { DataGrid, GridToolbar } from '@mui/x-data-grid';
 import { Button, ButtonGroup } from '@mui/material';
-import new_theme from "./theme";
-import Container from '@mui/material/Container';
-import Paper from '@mui/material/Paper';
 import Box from '@mui/material/Box';
 
 import "./App.css";
@@ -160,6 +156,7 @@ function ProcessesTable({rows, pausedTableUpdate, setPausedTableUpdate, selected
           }}
           rowSelectionModel={rowSelectionModel}
           hideFooterSelectedRowCount={true}
+          slotProps={{ toolbar: { printOptions: { disableToolbarButton: true } } }}
           
         />
         <div style={{ display: 'flex', justifyContent: "space-between" }}>

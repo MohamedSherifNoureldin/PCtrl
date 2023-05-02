@@ -1,11 +1,8 @@
 import Divider from '@mui/material/Divider';
 import Chip from '@mui/material/Chip';
-import Paper from '@mui/material/Paper';
 import Box from '@mui/material/Box';
-import { useState, useEffect } from "react";
 import * as React from 'react';
 import Grid from '@mui/material/Unstable_Grid2'; // Grid version 2
-import randomColor from 'randomcolor';
 import { useMediaQuery } from '@mui/material';
 import { PieChart, Pie, Sector, BarChart, Bar, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 

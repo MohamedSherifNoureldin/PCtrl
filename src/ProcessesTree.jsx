@@ -5,9 +5,6 @@ import * as React from 'react';
 import "./App.css";
 import Box from '@mui/material/Box';
 import { TreeView, TreeItem } from '@mui/lab';
-import ExpandLessIcon from '@mui/icons-material/ExpandLess';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import ArrowRightIcon from '@mui/icons-material/ArrowRight';
 
 import AddBoxIcon from '@mui/icons-material/AddBox';
 import IndeterminateCheckBoxIcon from '@mui/icons-material/IndeterminateCheckBox';

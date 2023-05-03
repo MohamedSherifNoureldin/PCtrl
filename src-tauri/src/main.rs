@@ -39,14 +39,10 @@ fn main() {
             .about("Record information about certain processes in a file")
             .arg(
                 clap::Arg::new("record_pids")
-                //.short('p')
-                //.long("pids")
                 .value_name("PIDS_TO_RECORD")
                 .help("PID to record")
-                //.value_delimiter(',')
                 .value_parser(clap::value_parser!(u32))
                 .required(true)
-                //.action(ArgAction::Append)
             )
             // .arg(
             //     clap::Arg::new("output_file")
@@ -65,24 +61,6 @@ fn main() {
                 .value_name("PID_TO_TRACK")
                 .help("PID to track")
                 .value_parser(clap::value_parser!(u32))
-                .required(true)
-            )
-        )
-        .subcommand(
-            Command::new("setnice")
-            .about("change the 'nice' priority value of a process.")
-            .arg(
-                clap::Arg::new("setpriority_pid")
-                .value_name("PID")
-                .help("PID to change priority")
-                .value_parser(clap::value_parser!(u32))
-                .required(true)
-            )
-            .arg(
-                clap::Arg::new("setpriority_val")
-                .value_name("Value")
-                .help("new nice value")
-                .value_parser(clap::value_parser!(i32))
                 .required(true)
             )
         )
@@ -198,18 +176,18 @@ fn main() {
             keep_alive(keepalive_pid);
             record_mode = true;
         },
-        Some(("setnice", sub_matches)) => {
-            let setpriority_pid: u32 = sub_matches.get_one::<u32>("setpriority_pid").unwrap().clone();
-            let setpriority_val: i32 = sub_matches.get_one::<i32>("setpriority_val").unwrap().clone();
-            if change_priority(setpriority_pid, setpriority_val) { // changes nice value
-                println!("Nice value for PID:{} updated successfully.", setpriority_pid);
-            }
-            else {
-                println!("Couldn't set nice value for PID:{} to {}", setpriority_pid, setpriority_val);
-                println!("Tip: use sudo when setting a higher priority (lower nice value).");
-            }
-            record_mode = true;
-        },
+        // Some(("setnice", sub_matches)) => {
+        //     let setpriority_pid: u32 = sub_matches.get_one::<u32>("setpriority_pid").unwrap().clone();
+        //     let setpriority_val: i32 = sub_matches.get_one::<i32>("setpriority_val").unwrap().clone();
+        //     if change_priority(setpriority_pid, setpriority_val) { // changes nice value
+        //         println!("Nice value for PID:{} updated successfully.", setpriority_pid);
+        //     }
+        //     else {
+        //         println!("Couldn't set nice value for PID:{} to {}", setpriority_pid, setpriority_val);
+        //         println!("Tip: use sudo when setting a higher priority (lower nice value).");
+        //     }
+        //     record_mode = true;
+        // },
         Some(("gui", _)) => {
             display_gui();
         },
@@ -218,10 +196,6 @@ fn main() {
 
     if !record_mode {
         display_tui(columns_to_display);
-        // unsafe
-        // {
-        //     filter_process(&mut _PROCESSES);
-        // }
     }
     
 }

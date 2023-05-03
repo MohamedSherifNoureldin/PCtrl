@@ -136,31 +136,12 @@ pub fn display_tui(columns_to_display: Vec<String>) {
 
     table.set_items(processes_to_display);
     table.set_default_column(unsafe{_CONFIG.current_column.clone()});
-    // Detect clicks on column headers
-    //let mut booltest: &'static bool = &true;
     table.set_on_sort( move |siv: &mut Cursive, column: BasicColumn, order: Ordering| {  
-        //  if (column == BasicColumn::CMD) {
-        //     unsafe {SHOW_TREE = true;}
-        //  }
-        // else {
-        //     unsafe {SHOW_TREE = false;}
-        // }
         unsafe {
             update_views(siv, &mut _PROCESSES, &mut _PID_TABLE, &mut _SYS_STATS, *_CONFIG,counter);
             _CONFIG.current_column = column;
         }
-        // siv.add_layer(
-        //     Dialog::around(TextView::new(format!("{} / {:?}", column.as_str(), order)))
-        //         .title("Sorted by")
-        //         .button("Close", |s| {
-        //             s.pop_layer();
-        //         }),
-        // );
     });
-    // if *booltest == true {
-    //     table.sort_by(BasicColumn::Index, Ordering::Less);
-    // }
-
 
     siv.add_layer(
         LinearLayout::vertical()
@@ -187,7 +168,7 @@ pub fn display_tui(columns_to_display: Vec<String>) {
             )
             .child(Dialog::around(table.with_name("table").full_screen()).title("Processes"))
             .child(Dialog::around(LinearLayout::horizontal()
-            .child(TextView::new("Exit <q> - Pause/Unpause <space> - Process Tree <t> - Kill <k> - Suspend/Resume <p>/<r> - Filter <s>/<ctrl+f> - Clear filters <c> - Save config <ctrl+s>").h_align(HAlign::Center))
+            .child(TextView::new("Exit <q> - Pause/Unpause realtime <space> - Process Tree <t> - Kill <k> - Suspend/Resume <p>/<r> - Change Nice <n> - Filter <s>/<ctrl+f> - Clear filters <c> - Save config <ctrl+s>").h_align(HAlign::Center))
             
         ).title("Controls"))
         .child(TextView::new("Status: Updating in realtime...").h_align(HAlign::Right).with_name("status").full_width())
@@ -334,6 +315,62 @@ pub fn display_tui(columns_to_display: Vec<String>) {
         }
     });
 
+    // add a callback to change process priority when user presses 'c' while selecting a row
+    siv.add_global_callback('n', |s| {
+        s.add_layer(
+            Dialog::around(
+                LinearLayout::vertical()
+                    .child(TextView::new("Select new nice value:"))
+                    .child(SelectView::new()
+                        .item_str("-20").item_str("-19").item_str("-18").item_str("-17").item_str("-16").item_str("-15")
+                        .item_str("-14").item_str("-13").item_str("-12").item_str("-11").item_str("-10").item_str("-9")
+                        .item_str("-8").item_str("-7").item_str("-6").item_str("-5").item_str("-4").item_str("-3")
+                        .item_str("-2").item_str("-1").item_str("0").item_str("1").item_str("2").item_str("3").item_str("4")
+                        .item_str("5").item_str("6").item_str("7").item_str("8").item_str("9").item_str("10").item_str("11")
+                        .item_str("12").item_str("13").item_str("14").item_str("15").item_str("16").item_str("17").item_str("18")
+                        .item_str("19")
+                        .popup().with_name("column_input").full_width()
+                    )
+                    .child(TextView::new("Please note that the lower the nice value, the higher the priority. The actual priority is calculated as 20 + nice value. If you are not running this application as elevated, then you can only decrease the priority of the process."))
+            )
+            .button("Update Nice Value", |s| {
+                let mut pid = 0;
+                let mut column = 0;
+                s.call_on_name("table", |view: &mut TableView<Process, BasicColumn>| {
+                    let selected_row: usize = view.item().unwrap() as usize;
+                    let selected_item = view.borrow_item(selected_row).unwrap().clone();
+                    pid = selected_item.pid;
+                });
+                s.call_on_name("column_input", |view: &mut SelectView| {
+                    column = view.selection().unwrap().parse().unwrap();
+                });
+                let success = change_priority(pid, column);
+                if success {
+                    s.add_layer(
+                        Dialog::around(TextView::new(format!("Successfully changed nice value of process with PID: {}", pid)))
+                            .title("Success")
+                            .button("Close", |s| {
+                                s.pop_layer();
+                                s.pop_layer();
+                            }),
+                    );
+                } else {
+                    s.add_layer(
+                        Dialog::around(TextView::new(format!("Failed to change nice value of process with PID: {}", pid)))
+                            .title("Error")
+                            .button("Close", |s: &mut Cursive| {
+                                s.pop_layer();
+                            }),
+                    );
+                }
+            })
+            .button("Close", |s| {
+                s.pop_layer();
+            })
+            .title("Change Nice Value")
+        );
+    });
+
     siv.add_global_callback(cursive::event::Event::Refresh, move |s| {
         unsafe{
             update_views(s, &mut _PROCESSES, &mut _PID_TABLE, &mut _SYS_STATS, *_CONFIG,counter);
@@ -460,60 +497,11 @@ pub fn display_tui(columns_to_display: Vec<String>) {
         }
     });
 
-    let mut pid_to_row: HashMap<u32, usize> = HashMap::new();
-    let mut row_counter = 0;
-
-    // let mut new_processes = unsafe{_PROCESSES.clone()};
-    // new_processes.sort_by(|a, b| a.pid.cmp(&b.pid));
-    // let mut tree = TreeView::new();
-    
-    // for process in new_processes.iter() {
-    //     if process.pid == 1 {
-    //         let row_id = tree.insert_item(format!("{} - {}", process.pid, process.name), Placement::LastChild, 0).unwrap();
-    //         row_counter += 1;
-    //         pid_to_row.insert(process.pid, row_id);
-    //         println!("Added {} with ppid {} to row {} and it got row_id {}", process.pid, process.parent_pid, 0, row_id);
-    //     }
-    //     else {
-    //         if pid_to_row.contains_key(&process.parent_pid) {
-    //             let row = pid_to_row.get(&process.parent_pid).unwrap();
-    //             let row_id = tree.insert_item(format!("{} - {}", process.pid, process.name), Placement::LastChild, (*row).try_into().unwrap()).unwrap();
-    //             row_counter += 1;
-    //             println!("Added {} with ppid {} to row {} and it got row_id {}", process.pid, process.parent_pid, row, row_id);
-    //             pid_to_row.insert(process.pid, row_id);
-    //         } else {
-    //             let row_id = tree.insert_item(format!("{} - {}", process.pid, process.name), Placement::LastChild, row_counter.try_into().unwrap()).unwrap();
-    //             row_counter += 1;
-    //             pid_to_row.insert(process.pid, row_id);
-    //             println!("ELSE:: Added {} with ppid {} to row {} and it got row_id {}", process.pid, process.parent_pid, row_counter, row_id);
-    //         }
-    //     }
-    // }
-
-    // // siv.add_layer(Dialog::text(format!("{:?}", pid_to_row)));
-    // siv.add_layer(Dialog::around(tree.scrollable().with_name("tree")).title("Processes").button("Ok", |s| {
-    //     s.pop_layer();
-    // }));
-
-    // let mut tree = TreeView::new();
-    // tree.insert_item("ROOT", Placement::LastChild, 0);
-    // tree.insert_item("1stChild", Placement::LastChild, 1);
-    // tree.insert_item("2ndChild", Placement::LastChild, 2);
-    // tree.insert_item("3rdChild", Placement::LastChild, 1);
-    // tree.insert_item("4thChild", Placement::LastChild, 4);
-    
-    // siv.add_layer(Dialog::around(tree.scrollable().with_name("tree")).title("Processes").button("Ok", |s| {
-    //     s.pop_layer();
-    // }));
-
     siv.run();
-    //println!("{:?}", pid_to_row);
 }
 
 pub fn filter_process(procs: &mut Vec<Process>) -> Vec<Process> {
     let mut filtered_procs: Vec<Process> = procs.clone();
-//    unsafe{
-        // read filters one by one from the _FILTERS vector
         for filter in unsafe{_FILTERS.iter()} {
             if filter.column == "PID" || filter.column == "PPID" || filter.column == "PRI" || filter.column == "FD" 
             {
@@ -640,15 +628,12 @@ pub fn filter_process(procs: &mut Vec<Process>) -> Vec<Process> {
             }
             i += 1;
         }
-        //println!("{} lensize", filtered_procs.len().clone());
-        //println!("procs: {}", procs.len().clone());
         i = 0;
     
         while i < filtered_procs.len().clone() {
             let mut saved_i = i;
             let child_list = filtered_procs[i].children.clone();
             filtered_procs[i].index = i as u32;
-            //println!("childsize: {}", filtered_procs[i].children.len());
             for child in child_list { 
                 saved_i += 1;
                 filtered_procs.insert(saved_i,  procs[unsafe {_PID_TABLE[&child] as usize } ].clone()); 
@@ -664,15 +649,10 @@ pub fn filter_process(procs: &mut Vec<Process>) -> Vec<Process> {
                 let name = filtered_procs[saved_i].name.clone();
                 filtered_procs[saved_i].name = format!("  {}{}", parent_spaces, name);
                 assert_eq!(filtered_procs[saved_i].parent_pid, filtered_procs[i].pid);
-                // println!("added: {} for index: {}", child, i.clone());
             }
-            // println!("index: {}", i.clone());
             i += 1;
         }
     }
-    // println!("Size: {}", filtered_procs.len().clone());
-    // println!("procs: {}", procs.len().clone());
-    //unsafe{ println!("PROC: {}", _PROCESSES.len().clone());}
     filtered_procs
 }
 

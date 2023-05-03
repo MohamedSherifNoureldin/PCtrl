@@ -19,6 +19,13 @@ fn kill_process(pid: u32) -> bool {
 }
 
 #[tauri::command]
+fn kill_processes_recursively(pid: u32) -> bool {
+   let selected_process = unsafe{_PROCESSES[_PID_TABLE[&pid] as usize].clone()};
+   let success = crate::our_mods::proc_functions::kill_processes_recursively(&selected_process);
+   success
+}
+
+#[tauri::command]
 fn pause_process(pid: u32) -> bool {
    let success = crate::our_mods::proc_functions::pause_process(pid);
    success
@@ -47,7 +54,7 @@ fn get_system_info() -> SysStats {
 
 pub fn display_gui() {
     tauri::Builder::default()
-      .invoke_handler(tauri::generate_handler![get_processes, kill_process, pause_process, resume_process, get_system_info, change_priority_process])
+      .invoke_handler(tauri::generate_handler![get_processes, kill_process, kill_processes_recursively, pause_process, resume_process, get_system_info, change_priority_process])
       .run(tauri::generate_context!())
       .expect("error while running tauri application");
 }

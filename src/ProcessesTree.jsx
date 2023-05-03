@@ -13,6 +13,14 @@ import DisabledByDefaultIcon from '@mui/icons-material/DisabledByDefault';
 import { styled, alpha } from '@mui/material/styles';
 import { treeItemClasses } from '@mui/lab/TreeItem';
 import Divider from '@mui/material/Divider';
+import { Button, ButtonGroup } from '@mui/material';
+
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogContentText from '@mui/material/DialogContentText';
+import DialogTitle from '@mui/material/DialogTitle';
+
 
 
 function buildTree(processes, parentPid) {
@@ -58,18 +66,47 @@ function buildTree(processes, parentPid) {
     },
   }));
   
+const kill_processes_recursively = (pid) => {
+  pid = parseInt(pid);
+  console.log("PID: " + pid);
+    invoke("kill_processes_recursively", {pid: pid}).then((result) => {
+        console.log(result);
+    });
+}; 
+
+
 function ProcessesTree({processes}) 
 {
+    useEffect(() => {
+        console.log("ProcessesTree mounted")
+        setTreeData(buildTree(processes, 0))
+    }, [processes]);
     console.log(processes);
     const [treeData, setTreeData] = useState(buildTree(processes, 0));
+    const [selectedNode, setSelectedNode] = useState(null);
     console.log(treeData);
 
+    const [open, setOpen] = React.useState(false);
+    const openDialog = () => {
+      setOpen(true);
+    };
+    const closeDialog = () => {
+      setOpen(false);
+    };
+
+
     return (
+      <Box>
+        <div style={{ display: 'flex', justifyContent: "center" }}>
+        {selectedNode && <Button variant="contained" size="large" onClick={() => {kill_processes_recursively(selectedNode); setTreeData(buildTree(processes, 0))}}>Kill entire branch</Button>}
+        </div>
         <TreeView
         defaultCollapseIcon={<IndeterminateCheckBoxIcon />}
         defaultExpandIcon={<AddBoxIcon />}
         defaultEndIcon={<DisabledByDefaultIcon className="close"/>}
+        onNodeSelect={(event, node) => {setSelectedNode(node); console.log(node);}}
         >{treeData.map((node) => renderTree(node))}</TreeView>
+      </Box>
     )
 }
 

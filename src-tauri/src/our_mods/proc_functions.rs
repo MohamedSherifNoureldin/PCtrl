@@ -483,6 +483,18 @@ pub fn kill_process(pid: u32) -> bool {
     output.status.success()
 }
 
+pub fn kill_processes_recursively(process: &Process) -> bool {
+    let mut success = true;
+    for child in &process.children {
+        let child_process;
+        unsafe {
+            child_process = _PROCESSES[_PID_TABLE[&child] as usize].clone();
+        }        
+        success = success && kill_processes_recursively(&child_process);
+    }
+    success && kill_process(process.pid)
+}
+
 
 
 pub fn pause_process(pid: u32) -> bool {

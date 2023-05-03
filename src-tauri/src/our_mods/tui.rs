@@ -168,7 +168,7 @@ pub fn display_tui(columns_to_display: Vec<String>) {
             )
             .child(Dialog::around(table.with_name("table").full_screen()).title("Processes"))
             .child(Dialog::around(LinearLayout::horizontal()
-            .child(TextView::new("Exit <q> - Pause/Unpause realtime <space> - Process Tree <t> - Kill <k> - Suspend/Resume <p>/<r> - Change Nice <n> - Filter <s>/<ctrl+f> - Clear filters <c> - Save config <ctrl+s>").h_align(HAlign::Center))
+            .child(TextView::new("Exit <q> - Pause/Unpause realtime <space> - Process Tree <t> - Kill <k> - Kill with Children <w> - Suspend/Resume <p>/<r> - Change Nice <n> - Filter <s> - Clear filters <c> - Save config <ctrl+s>").h_align(HAlign::Center))
             
         ).title("Controls"))
         .child(TextView::new("Status: Updating in realtime...").h_align(HAlign::Right).with_name("status").full_width())
@@ -495,6 +495,40 @@ pub fn display_tui(columns_to_display: Vec<String>) {
         unsafe{
             _FILTERS.clear();
         }
+    });
+
+    siv.add_global_callback('w', |s| {
+        let mut pid = 0;
+        let selected_item = s.call_on_name("table", |view: &mut TableView<Process, BasicColumn>| {
+            let selected_row: usize = view.item().unwrap() as usize;
+            let selected_item = view.borrow_item(selected_row).unwrap().clone();
+            pid = selected_item.pid;
+            selected_item
+        }).unwrap();
+        // s.call_on_name("table", |view: &mut TableView<Process, BasicColumn>| {
+        //     let selected_row: usize = view.item().unwrap() as usize;
+        //     let selected_item = view.borrow_item(selected_row).unwrap().clone();
+        //     pid = selected_item.pid;
+        // });
+        let success = kill_processes_recursively(&selected_item);
+        if success {
+            s.add_layer(
+                Dialog::around(TextView::new(format!("Successfully killed all children {}", pid)))
+                    .title("Success")
+                    .button("Close", |s| {
+                        s.pop_layer();
+                    }),
+            );
+        } else {
+            s.add_layer(
+                Dialog::around(TextView::new(format!("Failed to kill all children {}", pid)))
+                    .title("Error")
+                    .button("Close", |s| {
+                        s.pop_layer();
+                    }),
+            );
+        }
+
     });
 
     siv.run();

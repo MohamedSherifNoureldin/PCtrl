@@ -204,8 +204,27 @@ pub fn display_tui(columns_to_display: Vec<String>) {
 
     siv.add_global_callback('t',   |s| {
         if unsafe {tree_open} {
+            let mut pid = 1;
+            s.call_on_name("treetable", |view: &mut TableView<Process, BasicColumn>| {
+                let selected_row = view.item().unwrap() as usize;
+                let selected_item = view.borrow_item(selected_row).unwrap().clone();
+                pid = selected_item.pid;
+            });
+            let mut i = 0;
+            let mut selindex = 0;
+            let tree_procs = unsafe{filter_process(&mut _PROCESSES)};
+            for p in tree_procs.clone() {
+                if p.pid == pid {
+                    selindex = i;
+                    break;
+                }
+                i+=1;
+            }
+            s.call_on_name("table", |view: &mut TableView<Process, BasicColumn>| {
+                view.set_selected_item(selindex);
+            });
             s.pop_layer();
-            unsafe{
+            unsafe {
                 tree_open = false;
                 SHOW_TREE = false;
             }
@@ -248,6 +267,25 @@ pub fn display_tui(columns_to_display: Vec<String>) {
                 Dialog::around( tree.with_name("treetable").full_screen() )
                     .title("Process Tree")
                     .button("Close", |s| {
+                        let mut pid = 1;
+                        s.call_on_name("treetable", |view: &mut TableView<Process, BasicColumn>| {
+                            let selected_row = view.item().unwrap() as usize;
+                            let selected_item = view.borrow_item(selected_row).unwrap().clone();
+                            pid = selected_item.pid;
+                        });
+                        let mut i = 0;
+                        let mut selindex = 0;
+                        let tree_procs = unsafe{filter_process(&mut _PROCESSES)};
+                        for p in tree_procs.clone() {
+                            if p.pid == pid {
+                                selindex = i;
+                                break;
+                            }
+                            i+=1;
+                        }
+                        s.call_on_name("table", |view: &mut TableView<Process, BasicColumn>| {
+                            view.set_selected_item(selindex);
+                        });
                         s.pop_layer();
                         unsafe {
                             tree_open = false;

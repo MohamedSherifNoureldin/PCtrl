@@ -15,6 +15,8 @@ use crate::our_mods::gui::*;
 use std::io::prelude::*;
 use std::fs::File;
 extern crate dirs;
+use std::thread;
+use std::process;
 
 
 // main function
@@ -121,8 +123,13 @@ fn main() {
         )
         .subcommand(
             Command::new("gui")
-            .about("Start the GUI version of the application")
+            .about("Launch the GUI version of the application with the TUI")
         )
+        .subcommand(
+            Command::new("gui_only")
+            .about("Start the application as a GUI")
+        )
+        
         .get_matches();
     
     let columns_to_display: Vec<String> = matches.get_many::<String>("columns").unwrap().map(|s| s.trim().to_string().to_uppercase()).collect();
@@ -189,7 +196,26 @@ fn main() {
         //     record_mode = true;
         // },
         Some(("gui", _)) => {
+            let col_to_disp = columns_to_display.clone();
+            //run tui as thread (closes when GUI is closed)
+            let tui = thread::spawn(move || {
+                display_tui(col_to_disp);
+            });
             display_gui();
+            // wait for tui to end if display_gui fails
+            tui.join().unwrap(); 
+            
+        //     // run gui as child proc, running sma eprogram twice, not as efficient.
+        //     let mut child =
+        //     process::Command::new("./lpm gui_only")
+        //     //.stdout(process::Stdio::piped())
+        //     //.stderr(process::Stdio::piped())
+        //     .spawn()
+        //     .expect("Couldn't run program");
+        },
+        Some(("gui_only", _)) => {
+            display_gui();
+            record_mode = true;
         },
         _ => unsafe{_FILTERS.clear()},
     }

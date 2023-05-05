@@ -64,7 +64,7 @@ function App() {
           // cpu usage line graph data
           const cpuUsageDataLineGraph = systemRes.cpu_hist.map((data, index) => {
             const cores = data.reduce((acc, val, coreIndex) => {
-              acc[`core${coreIndex + 1}`] = val;
+              acc[`core${coreIndex + 1}`] = val.toFixed(2);
               return acc;
             }, {});
             if(index === 0)
@@ -84,10 +84,18 @@ function App() {
           const cpuUsageDataBarChart = systemRes.cpu_hist[0].map((coreUsage, index) => {
             return {
               core: `core${index + 1}`,
-              usage: coreUsage,
+              usage: coreUsage.toFixed(2),
             };
           });
           setCpuUsageDataBarChart(cpuUsageDataBarChart);
+          
+          var systemAvgCPU = 0;
+          for (let i = 0; i < systemRes.cpu_hist[0].length; i++) {
+          	systemAvgCPU += systemRes.cpu_hist[0][i] / 100;
+          
+          }
+          systemAvgCPU = systemAvgCPU / systemRes.cpu_hist[0].length;
+         
 
           // cpu usage pie chart data
           const totalCpuUsage = {};
@@ -96,7 +104,7 @@ function App() {
           procRes.forEach((process) => {
             const processName = process.name;
             const cpuHist = process.cpu_hist;
-            const cpuUsage = cpuHist[0]*100;
+            const cpuUsage = cpuHist[0]*systemAvgCPU*100;
 
             // If the process's cpu usage is greater than 5%, add it to the total cpu usage object
             if (cpuUsage > 5) {
@@ -132,8 +140,8 @@ function App() {
           const memUsageDataLineGraph = systemRes.ram_hist.map((data, index) => {
             return {
               name: (index==0)?'1 sec':`${index + 1} secs`,
-              mem_usage: data,
-              swap_usage: systemRes.swap_hist[index],
+              mem_usage: data.toFixed(2),
+              swap_usage: systemRes.swap_hist[index].toFixed(2),
             };
           });
           setMemUsageDataLineGraph(memUsageDataLineGraph);

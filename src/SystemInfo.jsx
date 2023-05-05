@@ -86,7 +86,7 @@ function SystemInfo({systeminfo, cpuUsageDataLineGraph, cpuUsageDataBarChart, cp
                     >
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="name"/>
-                        <YAxis unit="%"/>
+                        <YAxis unit="%" ticks={[0, 25, 50, 75, 100]}/>
                         <Tooltip />
                         <Legend />
                         {Array.from({ length: systeminfo.cpu_cores_num }).map((_, index) => (
@@ -96,7 +96,7 @@ function SystemInfo({systeminfo, cpuUsageDataLineGraph, cpuUsageDataBarChart, cp
                             type="monotone"
                             dataKey={`core${index + 1}`}
                             stroke={colors[index]}
-                            //isAnimationActive={false}
+                            isAnimationActive={false}
                             />
                         ))}
                     </LineChart>
@@ -118,13 +118,13 @@ function SystemInfo({systeminfo, cpuUsageDataLineGraph, cpuUsageDataBarChart, cp
                         >
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis dataKey="core" />
-                            <YAxis unit="%"/>
+                            <YAxis unit="%" ticks={[0, 25, 50, 75, 100]}/>
                             <Tooltip />
                             <Bar
                                 type="monotone"
                                 dataKey="usage"
                                 fill={colors[2]}
-                                //isAnimationActive={false}
+                                isAnimationActive={false}
                             >
                             {cpuUsageDataBarChart.map((entry, index) => (
                                 <Cell key={`cell-${index}`} fill={colors[index%60]} />
@@ -145,7 +145,7 @@ function SystemInfo({systeminfo, cpuUsageDataLineGraph, cpuUsageDataBarChart, cp
                             outerRadius={100}
                             fill="#8884d8"
                             dataKey="cpu_usage"
-                            //isAnimationActive={false}
+                            isAnimationActive={false}
                             label
                             >
                             {cpuUsageDataPieChart.map((entry, index) => (
@@ -178,7 +178,7 @@ function SystemInfo({systeminfo, cpuUsageDataLineGraph, cpuUsageDataBarChart, cp
                         >
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis dataKey="name" />
-                            <YAxis unit="MB"/>
+                            <YAxis unit="MB" ticks={[0, systeminfo.mem_total]}/>
                             <Tooltip />
                             <Legend />
 

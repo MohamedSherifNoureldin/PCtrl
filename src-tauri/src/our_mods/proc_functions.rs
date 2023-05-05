@@ -427,6 +427,7 @@ pub fn record_prc(procs: &mut Vec<Process>, pid_table: &mut HashMap<u32, u16>, p
         return
     }
     println!("Recording process {}:{}...", pid, procs[pid_table[&pid] as usize].name);
+    println!("Recording to 'HOME/.local/share/pctrl/pctrl_{}.plog'", pid);
     println!("Press <ctrl+c> to stop recording.");
     //let prc = &procs[pid_table[&pid] as usize];
     // let mut which_file: bool = false;
@@ -434,6 +435,7 @@ pub fn record_prc(procs: &mut Vec<Process>, pid_table: &mut HashMap<u32, u16>, p
     let mut stopped = false;
     let mut i =0;
     //while recording_procs.iter().any(|e| pid.contains(e)) && unsafe{!PAUSE_REC} {
+    writeln!(file, "Name  Owner  State  CPU  MEM  DISK  SWAP  timestamp").unwrap();
     while recording_procs.contains(&pid) && unsafe{!PAUSE_REC} {
         unsafe{update_procs(&mut _PID_TABLE, &mut _PROCESSES, &mut _SYS_STATS, *_CONFIG);} //REMOVE
         if !pid_table.contains_key(&pid) {
@@ -449,9 +451,9 @@ pub fn record_prc(procs: &mut Vec<Process>, pid_table: &mut HashMap<u32, u16>, p
                 /*println!("{}", format!("{} {} {:?} {} {} {} {} {} {}", p.name, p.owner, 
                 p.state.procstate, p.cpu_hist.front().unwrap(), p.ram_hist.front().unwrap_or(&def32), 
                 p.disk_hist.front().unwrap_or(&def32), p.net_hist.front().unwrap_or(&def32), p.swap_hist.front().unwrap_or(&def16), timestamp.format("%d/%m/%Y %H:%M:%S")));*/
-                writeln!(file, "{}", format!("{} {} {} {} {} {} {} {} {}", p.name, p.owner, 
+                writeln!(file, "{}", format!("{} {} {} {} {} {} {} {}", p.name, p.owner, 
                 p.state, p.cpu_hist.front().unwrap(), p.ram_hist.front().unwrap_or(&def32), 
-                p.disk_hist.front().unwrap_or(&def32), p.net_hist.front().unwrap_or(&def32), p.swap_hist.front().unwrap_or(&def16), timestamp.format("%d/%m/%Y %H:%M:%S"))).unwrap();
+                p.disk_hist.front().unwrap_or(&def32), p.swap_hist.front().unwrap_or(&def16), timestamp.format("%d/%m/%Y %H:%M:%S"))).unwrap();
                 stopped = false
             }, // writing using the macro 'writeln!'
             None => {

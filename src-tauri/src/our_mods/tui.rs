@@ -95,7 +95,10 @@ pub fn display_tui(columns_to_display: Vec<String>) {
     siv.set_theme(theme);
 
     // We can quit by pressing `q`
-    siv.add_global_callback('q', Cursive::quit);
+    siv.add_global_callback('q', |s| {
+        unsafe{TUI_Running = false;}
+        s.quit();
+    });
     
     // pause real time update by pressing space
     siv.add_global_callback(' ', |s| {

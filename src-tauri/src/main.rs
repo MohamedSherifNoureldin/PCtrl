@@ -16,7 +16,6 @@ use std::io::prelude::*;
 use std::fs::File;
 extern crate dirs;
 use std::thread;
-use std::process;
 
 
 // main function
@@ -198,9 +197,10 @@ fn main() {
         Some(("gui", _)) => {
             let col_to_disp = columns_to_display.clone();
             //run tui as thread (closes when GUI is closed)
-            let tui = thread::spawn(move || {
+            let mut tui = thread::spawn(move || {
                 display_tui(col_to_disp);
             });
+            unsafe{TUI_Running = true;}
             display_gui();
             // wait for tui to end if display_gui fails
             tui.join().unwrap(); 

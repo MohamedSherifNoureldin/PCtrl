@@ -59,6 +59,7 @@ pub fn display_gui() {
    .on_window_event(move |event| match event.event() {
       WindowEvent::CloseRequested { api, .. } => {
         if unsafe{TUI_Running} {
+         println!("Close the backend first!");
          api.prevent_close();
         }        
       }

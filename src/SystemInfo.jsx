@@ -96,7 +96,7 @@ function SystemInfo({systeminfo, cpuUsageDataLineGraph, cpuUsageDataBarChart, cp
                             type="monotone"
                             dataKey={`core${index + 1}`}
                             stroke={colors[index]}
-                            isAnimationActive={false}
+                            //isAnimationActive={false}
                             />
                         ))}
                     </LineChart>
@@ -124,7 +124,7 @@ function SystemInfo({systeminfo, cpuUsageDataLineGraph, cpuUsageDataBarChart, cp
                                 type="monotone"
                                 dataKey="usage"
                                 fill={colors[2]}
-                                isAnimationActive={false}
+                                //isAnimationActive={false}
                             >
                             {cpuUsageDataBarChart.map((entry, index) => (
                                 <Cell key={`cell-${index}`} fill={colors[index%60]} />

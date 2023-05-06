@@ -630,10 +630,10 @@ pub fn filter_process(procs: &mut Vec<Process>) -> Vec<Process> {
                     };
 
                     match filter.filter_type.as_str() {
-                        "eq" => target_field_value == filter_field_value,
-                        "neq" => target_field_value != filter_field_value,
-                        "greater" => target_field_value > filter_field_value,
-                        "less" => target_field_value < filter_field_value,
+                        "eq" => target_field_value.trim() == filter_field_value.trim(),
+                        "neq" => target_field_value.trim() != filter_field_value.trim(),
+                        "greater" => target_field_value.trim() > filter_field_value.trim(),
+                        "less" => target_field_value.trim() < filter_field_value.trim(),
                         _ => false,
                     }
                 })

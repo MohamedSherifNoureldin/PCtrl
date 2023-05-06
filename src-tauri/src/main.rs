@@ -22,8 +22,8 @@ use std::thread;
 fn main() {
     unsafe{ _CONFIG = Lazy::new(|| read_config()); }; // read config file
     
-    let matches = Command::new("lpm")
-        .version("0.1.0")
+    let matches = Command::new("PCtrl")
+        .version("1.0.0")
         .arg(
             clap::Arg::new("columns")
                 .short('c')
@@ -159,7 +159,7 @@ fn main() {
         },
         Some(("search", sub_matches)) => {
             let search_column: String = sub_matches.get_one::<String>("search_column").unwrap().trim().to_string().to_uppercase();
-            let search_term: String = sub_matches.get_one::<String>("search_value").unwrap().trim().to_string().to_uppercase();
+            let search_term: String = sub_matches.get_one::<String>("search_value").unwrap().trim().to_string();
             unsafe{
                 _FILTERS.clear();
                 _FILTERS.push(

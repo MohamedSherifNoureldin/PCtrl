@@ -90,12 +90,13 @@ function App() {
           setCpuUsageDataBarChart(cpuUsageDataBarChart);
           
           var systemAvgCPU = 0;
-          for (let i = 0; i < systemRes.cpu_hist[0].length; i++) {
-          	systemAvgCPU += systemRes.cpu_hist[0][i] / 100;
-          
+          if (systemRes.cpu_hist.length > 0) {
+            for (let i = 0; i < systemRes.cpu_hist[0].length; i++) {
+              systemAvgCPU += systemRes.cpu_hist[0][i] / 100;
+            
+            }
+            systemAvgCPU = systemAvgCPU / systemRes.cpu_hist[0].length;
           }
-          systemAvgCPU = systemAvgCPU / systemRes.cpu_hist[0].length;
-         
 
           // cpu usage pie chart data
           const totalCpuUsage = {};

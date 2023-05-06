@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::{thread, time::Duration};
 extern crate dirs;
 use std::fs::{create_dir, OpenOptions};
-use std::io::{SeekFrom, Seek, Write, stdout, self};
+use std::io::{SeekFrom, Seek, Write};
 use chrono::{DateTime, Local, Utc};
 use std::path::{Path};
 use std::fs::read_to_string; 
@@ -48,7 +48,7 @@ pub fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>,
 
     let mut cpus_usage :Vec<f32> = Vec::new();
 
-    let mut cpu_total:Vec<f64> = Vec::new();
+    let _cpu_total:Vec<f64> = Vec::new();
 
     let uptime = procfs::Uptime::new().unwrap().uptime;
 
@@ -61,7 +61,7 @@ pub fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>,
 
     let kstat = procfs::KernelStats::new().unwrap();
     let cputime = kstat.cpu_time;
-    let cputot = kstat.total;
+    let _cputot = kstat.total;
     //let _cputot = ((cputot.user + cputot.nice + cputot.system + cputot.idle + cputot.iowait.unwrap_or(0) + cputot.irq.unwrap_or(0) + cputot.softirq.unwrap_or(0) + cputot.steal.unwrap_or(0)) / ticks_per_second()) as f64;
 
     for cpu in cputime {
@@ -69,17 +69,17 @@ pub fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>,
         
         //100.0 * ((stat.utime+stat.stime) - _prev_duration) as f32 / (cpu_total - sys_stats._cpu_total) as f32 * cpu_count as f32
 
-        let idle = ((cpu.idle + cpu.iowait.unwrap_or(0)) ) ;
-        let _cputot = ((cpu.user + cpu.nice + cpu.system + cpu.idle + cpu.iowait.unwrap_or(0) + cpu.irq.unwrap_or(0) + cpu.softirq.unwrap_or(0) + cpu.steal.unwrap_or(0) + cpu.guest.unwrap_or(0) + cpu.guest_nice.unwrap_or(0)) ) ;
+        let idle = (cpu.idle + cpu.iowait.unwrap_or(0)) ;
+        let _cputot = (cpu.user + cpu.nice + cpu.system + cpu.idle + cpu.iowait.unwrap_or(0) + cpu.irq.unwrap_or(0) + cpu.softirq.unwrap_or(0) + cpu.steal.unwrap_or(0) + cpu.guest.unwrap_or(0) + cpu.guest_nice.unwrap_or(0)) ;
         let work = cpu.user + cpu.nice + cpu.system + cpu.irq.unwrap_or(0) + cpu.softirq.unwrap_or(0);
-        let mut var;
+        let var;
         if sys_stats._cpu_total.len() <= (cpu_count) as usize || cpu_count == 0 {
             var = 0;
         }
         else {
             var = sys_stats._cpu_total[(cpu_count) as usize];
         }
-         let mut var1;
+         let var1;
         if sys_stats._idle.len() <= cpu_count as usize || cpu_count == 0 {
             var1 = 0;
         }
@@ -99,13 +99,13 @@ pub fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>,
             sys_stats._cpu_total.push(_cputot);
         }
         else {
-            sys_stats._cpu_total[cpu_count as usize] = (_cputot);
+            sys_stats._cpu_total[cpu_count as usize] = _cputot;
         }
         if sys_stats._idle.len() <= cpu_count as usize || cpu_count == 0 {
             sys_stats._idle.push(idle);
         }
         else {
-            sys_stats._idle[cpu_count as usize] = (work);
+            sys_stats._idle[cpu_count as usize] = work;
         }
         //cpu_total.push(_cputot);
         cpus_usage.push( (((workd / totald)) * 100.0) as f32);
@@ -246,7 +246,7 @@ pub fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>,
 
         let _statm =  match prc.statm() {
 
-            Ok(statm) => { log_data(&mut procs[i].ram_hist, (stat.rss_bytes() / (1000*1000)) as u32, config); // size in mb 
+            Ok(_statm) => { log_data(&mut procs[i].ram_hist, (stat.rss_bytes() / (1000*1000)) as u32, config); // size in mb 
 
             },
 
@@ -529,7 +529,7 @@ pub fn save_config() -> Result<(), std::io::Error> {
         //.create_new(true)
         //.append(true)
         .open(file_name)?;
-    let mut config : Config = unsafe {_CONFIG.clone()};
+    let config : Config = unsafe {_CONFIG.clone()};
 
     writeln!(file, "{}\n{}\n{}\n{}", config.record_length, config.update_every, config.max_rec_limit, config.current_column.as_str());    
     let filters = unsafe{_FILTERS.clone()};
@@ -552,7 +552,7 @@ pub fn keep_alive(_pid: u32) {
     }
     let cmd = unsafe{ _PROCESSES[ _PID_TABLE[&pid] as usize ].name.clone() };
 
-    let mut running: bool = true;
+    let running: bool = true;
     println!("Keeping Alive PID:{} ..", pid);
     println!("Press <ctrl+c> to stop keepAlive.");
     while running  {        
@@ -561,7 +561,7 @@ pub fn keep_alive(_pid: u32) {
             //println!("cmd is {}", cmd);
             // let parts = cmd.split(" ").collect::<Vec<&str>>();
             // let args = &cmd[parts[0].len()..];
-            let output = Command::new("gnome-terminal")
+            let _output = Command::new("gnome-terminal")
             .args(&["--tab", "--", "bash", "-c", cmd.clone().as_str()])
             .output().expect("Failed to restart process");
             // let output = Command::new("/bin/sh")

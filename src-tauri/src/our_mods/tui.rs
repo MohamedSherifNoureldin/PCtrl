@@ -1,5 +1,5 @@
 //mod structures;
-use std::collections::LinkedList;
+
 use std::vec::Vec;
 use std::collections::HashMap;
 
@@ -11,7 +11,7 @@ use cursive::Cursive;
 use cursive::theme::{Color, PaletteColor, Theme, BorderStyle};
 use cursive::views::{Dialog, TextView, LinearLayout, EditView, DummyView, SelectView};
 use cursive_table_view::{TableView};
-use cursive_tree_view::{Placement, TreeView};
+
 use cursive::CursiveExt;
 use cursive::align::HAlign;
 use cursive::traits::*;
@@ -139,7 +139,7 @@ pub fn display_tui(columns_to_display: Vec<String>) {
 
     table.set_items(processes_to_display);
     table.set_default_column(unsafe{_CONFIG.current_column.clone()});
-    table.set_on_sort( move |siv: &mut Cursive, column: BasicColumn, order: Ordering| {  
+    table.set_on_sort( move |siv: &mut Cursive, column: BasicColumn, _order: Ordering| {  
         unsafe {
             update_views(siv, &mut _PROCESSES, &mut _PID_TABLE, &mut _SYS_STATS, *_CONFIG,counter);
             _CONFIG.current_column = column;

@@ -39,7 +39,7 @@ fn main() {
             Command::new("record")
             .about("Record information about certain processes in a file")
             .arg(
-                clap::Arg::new("record_pids")
+                clap::Arg::new("record_pid")
                 .value_name("PIDS_TO_RECORD")
                 .help("PID to record")
                 .value_parser(clap::value_parser!(u32))
@@ -171,7 +171,7 @@ fn main() {
             }
         },
         Some(("record", sub_matches)) => {
-            let recording_procs: Vec<u32> = sub_matches.get_many::<u32>("record_pids").unwrap().cloned().collect();
+            let recording_procs: Vec<u32> = sub_matches.get_many::<u32>("record_pid").unwrap().cloned().collect();
             unsafe{ 
                     record_prc(&mut _PROCESSES, &mut _PID_TABLE, recording_procs[0], recording_procs, &mut _CONFIG);
                     record_mode = true;
@@ -197,7 +197,7 @@ fn main() {
         Some(("gui", _)) => {
             let col_to_disp = columns_to_display.clone();
             //run tui as thread (closes when GUI is closed)
-            let mut tui = thread::spawn(move || {
+            let _tui = thread::spawn(move || {
                 display_tui(col_to_disp);
             });
             unsafe{*TUI_Running.get_mut() = true;}
@@ -266,7 +266,7 @@ fn read_config() -> Config {
                 }
             }
         },
-        Err(e) => {}
+        Err(_e) => {}
     };
 
     config

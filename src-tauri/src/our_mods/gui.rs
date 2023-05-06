@@ -2,7 +2,7 @@ use crate::our_mods::proc_functions::*;
 use crate::our_mods::structures::*;
 use crate::our_mods::tui::*;
 use tauri::{WindowEvent};
-use std::thread;
+
 
 #[tauri::command]
 fn get_processes() -> Vec<Process> {

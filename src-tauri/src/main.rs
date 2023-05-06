@@ -20,7 +20,7 @@ use std::thread;
 
 // main function
 fn main() {
-    unsafe{ _CONFIG = Lazy::new(|| readConfig()); }; // read config file
+    unsafe{ _CONFIG = Lazy::new(|| read_config()); }; // read config file
     
     let matches = Command::new("lpm")
         .version("0.1.0")
@@ -226,7 +226,7 @@ fn main() {
     
 }
  
-fn readConfig() -> Config {
+fn read_config() -> Config {
     let home = dirs::home_dir().unwrap().into_os_string().into_string().unwrap();
     let file_name = format!("{}/.local/share/pctrl/pctrl.conf", home); 
     //let file_name = String::from("pctrl.conf"); 

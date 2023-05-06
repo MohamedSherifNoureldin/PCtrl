@@ -517,7 +517,7 @@ pub fn resume_process(pid: u32) -> bool {
 
     output.status.success()
 }
-pub fn saveConfig() -> Result<(), std::io::Error> {
+pub fn save_config() -> Result<(), std::io::Error> {
     let home = dirs::home_dir().unwrap().into_os_string().into_string().unwrap();
     let file_name = format!("{}/.local/share/pctrl/pctrl.conf", home); 
     if !Path::new(&format!("{}/.local/share/pctrl", home)).exists() {

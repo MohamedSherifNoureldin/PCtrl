@@ -470,7 +470,7 @@ pub fn display_tui(columns_to_display: Vec<String>) {
         );
     });
     siv.add_global_callback(cursive::event::Event::CtrlChar('s'), |siv|{
-        match saveConfig() {
+        match save_config() {
             Ok(_) => {},
             Err(_e) => {
                 siv.add_layer(Dialog::text("Failed to Save Configuration").title("Failed to Save Configuration File").button("Ok", |s| {

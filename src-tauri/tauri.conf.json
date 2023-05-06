@@ -7,8 +7,8 @@
     "withGlobalTauri": false
   },
   "package": {
-    "productName": "lpm",
-    "version": "0.0.0"
+    "productName": "pctrl",
+    "version": "1.0.0"
   },
   "tauri": {
     "allowlist": {
@@ -31,7 +31,7 @@
         "icons/icon.icns",
         "icons/icon.ico"
       ],
-      "identifier": "com.aucians.lpm",
+      "identifier": "com.auc.pctrl",
       "targets": "all"
     },
     "security": {
@@ -46,7 +46,7 @@
         "resizable": true,
         "center": true,
         "maximized": false,
-        "title": "Linux Process Manager",
+        "title": "PCtrl",
         "width": 1200,
         "height": 1000
       }

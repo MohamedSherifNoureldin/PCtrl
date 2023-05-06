@@ -436,7 +436,7 @@ pub fn record_prc(procs: &mut Vec<Process>, pid_table: &mut HashMap<u32, u16>, p
     let mut i =0;
     //while recording_procs.iter().any(|e| pid.contains(e)) && unsafe{!PAUSE_REC} {
     writeln!(file, "Name  Owner  State  CPU  MEM  DISK  SWAP  timestamp").unwrap();
-    while recording_procs.contains(&pid) && unsafe{!PAUSE_REC} {
+    while recording_procs.contains(&pid) && unsafe{*PAUSE_REC.get_mut() == false} {
         unsafe{update_procs(&mut _PID_TABLE, &mut _PROCESSES, &mut _SYS_STATS, *_CONFIG);} //REMOVE
         if !pid_table.contains_key(&pid) {
             println!("-Process Exited-");

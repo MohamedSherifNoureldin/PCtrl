@@ -58,8 +58,8 @@ pub fn display_gui() {
    tauri::Builder::default()
    .on_window_event(move |event| match event.event() {
       WindowEvent::CloseRequested { api, .. } => {
-        if unsafe{TUI_Running} {
-         println!("\nClose the backend first!");
+        if unsafe{*TUI_Running.get_mut() == true} {
+         println!("Quit the backend first!");
          api.prevent_close();
         }        
       }

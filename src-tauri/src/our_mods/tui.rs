@@ -96,7 +96,7 @@ pub fn display_tui(columns_to_display: Vec<String>) {
 
     // We can quit by pressing `q`
     siv.add_global_callback('q', |s| {
-        unsafe{TUI_Running = false;}
+        unsafe{*TUI_Running.get_mut() = false;}
         s.quit();
     });
     

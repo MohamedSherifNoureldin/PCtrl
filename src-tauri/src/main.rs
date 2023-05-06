@@ -200,10 +200,10 @@ fn main() {
             let mut tui = thread::spawn(move || {
                 display_tui(col_to_disp);
             });
-            unsafe{TUI_Running = true;}
+            unsafe{*TUI_Running.get_mut() = true;}
             display_gui();
             // wait for tui to end if display_gui fails
-            tui.join().unwrap(); 
+            //tui.join().unwrap(); 
             
         //     // run gui as child proc, running sma eprogram twice, not as efficient.
         //     let mut child =

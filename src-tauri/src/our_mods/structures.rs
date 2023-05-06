@@ -9,6 +9,7 @@ use cursive_table_view::{TableViewItem };
 use std::cmp::Ordering;
 use once_cell::sync::Lazy;
 use serde::{Serialize, Deserialize};
+use std::sync::atomic::AtomicBool;
 
 
 
@@ -19,8 +20,8 @@ pub static mut _PID_TABLE : Lazy<HashMap<u32, u16>> = Lazy::new(|| HashMap::new(
 pub static mut _SYS_STATS : Lazy<SysStats> = Lazy::new(|| SysStats::default());
 pub static mut _CONFIG : Lazy<Config> = Lazy::new(|| Config::start());
 pub static mut _FILTERS : Lazy<Vec<FilterItem>> = Lazy::new(|| Vec::new());
-pub static mut PAUSE_REC:bool = false;
-pub static mut TUI_Running:bool = false;
+pub static mut PAUSE_REC:AtomicBool = AtomicBool::new(false);
+pub static mut TUI_Running:AtomicBool = AtomicBool::new(false);
 
 
 macro_rules! pub_struct {

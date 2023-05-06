@@ -137,24 +137,26 @@ pub fn update_procs(_pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>
         if !prc.is_alive() {continue};  //For only reading alive proces, ie not dead or zombie
         last_read = stat.pid as u32;
         proc_count += 1;
-        let i: usize;
+        let mut i: usize;
         let mut cmd: String = String::new();
         for entry in prc.cmdline().unwrap() {
             cmd.push_str(&format!("{} ", entry));
         }
-            
-        if proc_count as usize > procs.len() {
+        
+        if _pid_table.contains_key(&(stat.pid as u32)) {
+            i = _pid_table[&(stat.pid as u32)] as usize;
+        }
+        else {
+            i = proc_count as usize - 1;
+        }
+
+        if i as usize >= procs.len() {
             i = procs.len();
             let newproc : Process = Process::default();
             procs.push(newproc);
         }
         else {
-            if _pid_table.contains_key(&(stat.pid as u32)) {
-                i = _pid_table[&(stat.pid as u32)] as usize;
-            }
-            else {
-                i = proc_count as usize - 1;
-            }
+            
             if procs[i].pid != stat.pid as u32 { // proc has been replaced -> clear all history while updating
                 procs[i].cpu_hist.clear();
                 procs[i].ram_hist.clear();

@@ -84,6 +84,7 @@ fn main() {
                 .long("type")
                 .value_name("TYPE OF FILTER")
                 .help("Comma-separated list of type of filter to be applied on respective column")
+                .value_delimiter(',')
                 .value_parser(["eq", "neq", "greater", "less"])
                 .default_value("eq")
                 .required(true)

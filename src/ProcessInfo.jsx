@@ -86,7 +86,7 @@ function ProcessInfo({rows, selectedRow}) {
                     <span><b>Owner's Group:</b> {processInfo.group}</span>
                 </Grid>
                 <Grid xs={6} style={{textAlign: isSmallScreen ? 'center' : 'left',}}>
-                    <span><b>Start Time:</b> {Date(processInfo.start_time).toLocaleString()}</span>
+                    <span><b>Start Time:</b> {new Date(processInfo.start_time).toLocaleString()}</span>
                 </Grid>
                 <Grid xs={6} style={{textAlign: isSmallScreen ? 'center' : 'right',}}>
                     <span><b>State:</b> {processInfo.state}</span>

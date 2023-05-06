@@ -36,10 +36,10 @@ macro_rules! min {
 
 
 
-pub fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys_stats: &mut SysStats, config: Config) {
+pub fn update_procs(_pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>, sys_stats: &mut SysStats, config: Config) {
 
     let mut child_queue: Vec<(u32, u32)> = Vec::new(); // ppid, pid
-
+    let mut pid_table : HashMap<u32, u16> = HashMap::new();
     let mut total_net = 0;
 
     let mut proc_count:u32 = 0;
@@ -129,29 +129,15 @@ pub fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>,
     let mut last_read : u32 = 1;
 
     //procs.clear();
-
-    pid_table.clear();
-
-
+    //pid_table.clear();
 
     for prc in procfs::process::all_processes().unwrap() {
-
         let prc = prc.unwrap();
-
         let stat = prc.stat().unwrap();
-
         if !prc.is_alive() {continue};  //For only reading alive proces, ie not dead or zombie
-
-
-
         last_read = stat.pid as u32;
-
         proc_count += 1;
-
         let i: usize;
-
-
-
         let mut cmd: String = String::new();
         for entry in prc.cmdline().unwrap() {
             cmd.push_str(&format!("{} ", entry));
@@ -163,7 +149,12 @@ pub fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>,
             procs.push(newproc);
         }
         else {
-            i = proc_count as usize - 1;
+            if _pid_table.contains_key(&(stat.pid as u32)) {
+                i = _pid_table[&(stat.pid as u32)] as usize;
+            }
+            else {
+                i = proc_count as usize - 1;
+            }
             if procs[i].pid != stat.pid as u32 { // proc has been replaced -> clear all history while updating
                 procs[i].cpu_hist.clear();
                 procs[i].ram_hist.clear();
@@ -187,41 +178,22 @@ pub fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>,
             procs[i].name = stat.comm.clone();
 
         }
-
         else {
-
             procs[i].name = cmd;
-
         }
-
         procs[i]._mem_total = sys_stats.mem_total;
-
         procs[i].pid = stat.pid as u32;
-
         procs[i].parent_pid = stat.ppid as u32;
-
         procs[i].priority = stat.priority as u8;
-
         procs[i].start_time = stat.starttime().unwrap();
-
         procs[i].dir = prc.exe().unwrap_or_default();
-
         procs[i].owner = get_user_by_uid(prc.uid().unwrap()).unwrap().name().to_str().unwrap().to_string();
-
         procs[i].group = get_group_by_gid(stat.pgrp as u32).unwrap_or(Group::new(0, "none")).name().to_str().unwrap().to_string();
-
         match prc.fd_count() {
-
             Ok(_fdcount) => {procs[i].open_fds = _fdcount as u16; // only for root user
-
             },
-
             Err(_e) => {},
-
         };
-
-
-
         if stat.ppid > 0 { // parent-child relating
 
             if pid_table.contains_key(&(stat.ppid as u32)) {
@@ -369,34 +341,19 @@ pub fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>,
         sum += d.sectors_written;
 
     }
-
     log_data(&mut sys_stats.disk_hist , (sum * 512/(1024*1024)) as u32, config);
-
     log_data(&mut sys_stats.net_hist , (total_net/1024) as u32, config); // in mb
-
     log_data(&mut sys_stats.swap_hist ,((meminfo.swap_total - meminfo.swap_free) / (1024 * 1024)) as u16, config);
-
     sys_stats.cpu_cores_num = cpu_count;
-
     sys_stats.user_proc_count = proc_count;
-
     
-
     let freq = read_to_string("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq").unwrap_or_default();
-
     let temp = read_to_string("/sys/class/thermal/thermal_zone0/temp").unwrap_or_default();
 
-
-
     let freq = freq.trim().parse::<f64>().unwrap_or_default() / 1000.0;
-
     let temp = temp.trim().parse::<f64>().unwrap_or_default() / 1000.0;
-
     sys_stats.cpu_freq = freq as u16;
-
     sys_stats.cpu_temp = temp as i8;
-
-
 
     let cpuinfo = read_to_string("/proc/cpuinfo").unwrap_or_default();
 
@@ -404,6 +361,12 @@ pub fn update_procs(pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>,
     let model_name = model_name.split(":").nth(1).unwrap_or_default().trim();
     sys_stats.cpu_name = (*model_name).to_string();
     //sys_stats._cpu_total = cpu_total;
+
+    //copy new pid table
+    _pid_table.clear();
+    for entry in pid_table.keys() {
+        _pid_table.insert(*entry, pid_table[entry]);
+    }
 }
 
 pub fn record_prc(procs: &mut Vec<Process>, pid_table: &mut HashMap<u32, u16>, pid: u32, recording_procs: Vec<u32>, config: &mut Config) { // recordings exist in "/usr/local/pctrl/", process record format is plog

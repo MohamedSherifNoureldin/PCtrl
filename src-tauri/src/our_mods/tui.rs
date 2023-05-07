@@ -5,6 +5,7 @@ use std::collections::HashMap;
 
 use chrono::{DateTime};
 use std::num::NonZeroU32;
+use std::cmp;
 
 // cursive TUI imports
 use cursive::Cursive;
@@ -21,6 +22,7 @@ extern crate cursive_table_view;
 
 use super::structures::*;
 use super::proc_functions::*;
+
 
 static mut SHOW_TREE: bool = false;
 static mut tree_open: bool = false;
@@ -628,9 +630,10 @@ pub fn filter_process(procs: &mut Vec<Process>) -> Vec<Process> {
                         "STATE" => filter.value.to_string(),
                         _ => String::new(),
                     };
+                    let num = cmp::min(filter_field_value.len(), target_field_value.len());
 
                     match filter.filter_type.as_str() {
-                        "eq" => target_field_value.trim() == filter_field_value.trim(),
+                        "eq" => target_field_value[0..num].trim() == filter_field_value[0..num].trim(),
                         "neq" => target_field_value.trim() != filter_field_value.trim(),
                         "greater" => target_field_value.trim() > filter_field_value.trim(),
                         "less" => target_field_value.trim() < filter_field_value.trim(),

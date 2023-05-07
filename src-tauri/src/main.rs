@@ -15,7 +15,6 @@ use crate::our_mods::gui::*;
 use std::io::prelude::*;
 use std::fs::File;
 extern crate dirs;
-use std::thread;
 use std::process;
 
 
@@ -46,14 +45,6 @@ fn main() {
                 .value_parser(clap::value_parser!(u32))
                 .required(true)
             )
-            // .arg(
-            //     clap::Arg::new("output_file")
-            //     .short('o')
-            //     .long("output_file")
-            //     .value_name("FILE_TO_RECORD_IN")
-            //     .help("File to record in")
-            //     .required(true)
-            // )
         )
         .subcommand(
             Command::new("keepalive")
@@ -184,37 +175,15 @@ fn main() {
             keep_alive(keepalive_pid);
             record_mode = true;
         },
-        // Some(("setnice", sub_matches)) => {
-        //     let setpriority_pid: u32 = sub_matches.get_one::<u32>("setpriority_pid").unwrap().clone();
-        //     let setpriority_val: i32 = sub_matches.get_one::<i32>("setpriority_val").unwrap().clone();
-        //     if change_priority(setpriority_pid, setpriority_val) { // changes nice value
-        //         println!("Nice value for PID:{} updated successfully.", setpriority_pid);
-        //     }
-        //     else {
-        //         println!("Couldn't set nice value for PID:{} to {}", setpriority_pid, setpriority_val);
-        //         println!("Tip: use sudo when setting a higher priority (lower nice value).");
-        //     }
-        //     record_mode = true;
-        // },
         Some(("gui", _)) => {
-            let col_to_disp = columns_to_display.clone();
-            //run tui as thread (closes when GUI is closed)
-            let tui = process::Command::new("gnome-terminal")
-            .args(&["--tab", "--", "bash", "-c", "pctrl"])
+            use std::env;
+            let exe_path = env::current_exe().expect("Failed to get executable path");
+            println!("{:?}", exe_path);
+            let _tui = process::Command::new("gnome-terminal")
+            .args(&["--tab", "--", "bash", "-c", exe_path.to_str().unwrap()])
             .output().expect("Failed to start pctrl");
-            //unsafe{*TUI_Running.get_mut() = true;}
             display_gui();
-            // wait for tui to end if display_gui fails
-            //tui.join().unwrap(); 
-            
-        //     // run gui as child proc, running sma eprogram twice, not as efficient.
-        //     let mut child =
-        //     process::Command::new("./lpm gui_only")
-        //     //.stdout(process::Stdio::piped())
-        //     //.stderr(process::Stdio::piped())
-        //     .spawn()
-        //     .expect("Couldn't run program");
-        },
+            },
         Some(("gui_only", _)) => {
             display_gui();
             record_mode = true;
@@ -231,13 +200,12 @@ fn main() {
 fn read_config() -> Config {
     let home = dirs::home_dir().unwrap().into_os_string().into_string().unwrap();
     let file_name = format!("{}/.local/share/pctrl/pctrl.conf", home); 
-    //let file_name = String::from("pctrl.conf"); 
     let f = File::open(file_name);
     let mut config :Config = Config::start();
     let mut _f = match f {
         Ok(mut file) =>  {
             let mut data = String::new();
-            file.read_to_string(&mut data);
+            let _= file.read_to_string(&mut data);
             let contents = data.split('\n').collect::<Vec<&str>>();
 
             if contents.len() >= 4 {
@@ -245,10 +213,6 @@ fn read_config() -> Config {
                 config.update_every = contents[1].parse::<u32>().unwrap();
                 config.max_rec_limit = contents[2].parse::<u32>().unwrap();
                 config.current_column = BasicColumn::from_str(contents[3]);
-                // println!("read: {}", config.record_length);
-                // println!("read: {}", config.update_every);
-                // println!("read: {}", config.max_rec_limit);
-                // println!("read: {}", config.current_column.as_str());
                 if contents.len() > 4 {
                     for i in 4..contents.len() {
                         let parts = contents[i].split('|').collect::<Vec<&str>>();
@@ -256,7 +220,6 @@ fn read_config() -> Config {
                         let col = parts[0];
                         let val = parts[1];
                         let ftype = parts[2];
-                        // println!("read: {} . {} . {}", col, val, ftype);
                         unsafe{
                             _FILTERS.push(FilterItem {
                                 column: col.to_string(),

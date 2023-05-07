@@ -21,7 +21,7 @@ pub static mut _SYS_STATS : Lazy<SysStats> = Lazy::new(|| SysStats::default());
 pub static mut _CONFIG : Lazy<Config> = Lazy::new(|| Config::start());
 pub static mut _FILTERS : Lazy<Vec<FilterItem>> = Lazy::new(|| Vec::new());
 pub static mut PAUSE_REC:AtomicBool = AtomicBool::new(false);
-pub static mut TUI_Running:AtomicBool = AtomicBool::new(false);
+pub static mut TUI_RUNNING:AtomicBool = AtomicBool::new(false);
 
 
 macro_rules! pub_struct {

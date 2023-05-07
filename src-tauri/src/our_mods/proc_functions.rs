@@ -52,25 +52,13 @@ pub fn update_procs(_pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>
 
     let uptime = procfs::Uptime::new().unwrap().uptime;
 
-
-
-    let mut childcounts = 0;
-
-
-    //sys_stats._idle.clear();
-
     let kstat = procfs::KernelStats::new().unwrap();
     let cputime = kstat.cpu_time;
     let _cputot = kstat.total;
-    //let _cputot = ((cputot.user + cputot.nice + cputot.system + cputot.idle + cputot.iowait.unwrap_or(0) + cputot.irq.unwrap_or(0) + cputot.softirq.unwrap_or(0) + cputot.steal.unwrap_or(0)) / ticks_per_second()) as f64;
 
     for cpu in cputime {
-        // + cpu.guest.unwrap_or(0) + cpu.guest_nice.unwrap_or(0);
-        
-        //100.0 * ((stat.utime+stat.stime) - _prev_duration) as f32 / (cpu_total - sys_stats._cpu_total) as f32 * cpu_count as f32
-
-        let idle = (cpu.idle + cpu.iowait.unwrap_or(0)) ;
-        let _cputot = (cpu.user + cpu.nice + cpu.system + cpu.idle + cpu.iowait.unwrap_or(0) + cpu.irq.unwrap_or(0) + cpu.softirq.unwrap_or(0) + cpu.steal.unwrap_or(0) + cpu.guest.unwrap_or(0) + cpu.guest_nice.unwrap_or(0)) ;
+        let idle = cpu.idle + cpu.iowait.unwrap_or(0);
+        let _cputot = cpu.user + cpu.nice + cpu.system + cpu.idle + cpu.iowait.unwrap_or(0) + cpu.irq.unwrap_or(0) + cpu.softirq.unwrap_or(0) + cpu.steal.unwrap_or(0) + cpu.guest.unwrap_or(0) + cpu.guest_nice.unwrap_or(0) ;
         let work = cpu.user + cpu.nice + cpu.system + cpu.irq.unwrap_or(0) + cpu.softirq.unwrap_or(0);
         let var;
         if sys_stats._cpu_total.len() <= (cpu_count) as usize || cpu_count == 0 {
@@ -88,12 +76,7 @@ pub fn update_procs(_pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>
         }
         let totald = min!(_cputot, var, 0.0) as f64;
 
-        // let idled = (idle - (var1 / ticks_per_second() as f64)) as f64;
         let workd = min!(work, var1, 0.0) as f64;
-
-
-
-        // ((stat.utime+stat.stime)/ticks_per_second()) as f32  / (uptime as f32 - (stat.starttime/ticks_per_second()) as f32)
         
         if sys_stats._cpu_total.len() <= (cpu_count) as usize || cpu_count == 0 {
             sys_stats._cpu_total.push(_cputot);
@@ -109,27 +92,12 @@ pub fn update_procs(_pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>
         }
         //cpu_total.push(_cputot);
         cpus_usage.push( (((workd / totald)) * 100.0) as f32);
-        //println!("cputotal: {}", _cputot);
-        //println!("usage: {}", cpus_usage[cpu_count as usize]);
-        //println!("idle: {}", idle);
-        //println!("idled: {}", idled);
-        //println!("totald: {}", totald);
-        //cpus_usage.push(s.cpus());
-        //cpus_usage.push( (totald - idled) as f32/ totald as f32);
-
-        
-        
-        
-
         cpu_count += 1;
 
     }
 
 
     let mut last_read : u32 = 1;
-
-    //procs.clear();
-    //pid_table.clear();
 
     for prc in procfs::process::all_processes().unwrap() {
         let prc = prc.unwrap();
@@ -169,11 +137,7 @@ pub fn update_procs(_pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>
         if i >= procs.len() { continue }
         pid_table.insert(stat.pid as u32, i as u16);
         // Read Proc data
-        procs[i].state = format!("{:?}",stat.state().unwrap());
-        //procs[i].name = stat.comm;
-        
-
-        
+        procs[i].state = format!("{:?}",stat.state().unwrap());        
 
         if cmd.is_empty() {
 
@@ -199,141 +163,70 @@ pub fn update_procs(_pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>
         if stat.ppid > 0 { // parent-child relating
 
             if pid_table.contains_key(&(stat.ppid as u32)) {
-
                 procs[pid_table[&(stat.ppid as u32)] as usize].children.push(stat.pid as u32);
-
-                childcounts += 1;
-
             }
-
             else {
-
                 child_queue.push((stat.ppid as u32, stat.pid as u32));
-
             }
-
         }
-
-        
-
         let _prev_duration = procs[i]._prev_duration;
 
         let _statm =  match prc.statm() {
-
             Ok(_statm) => { log_data(&mut procs[i].ram_hist, (stat.rss_bytes() / (1000*1000)) as u32, config); // size in mb 
-
             },
-
             Err(_e) => {},
-
         };
-
-        //log_data(&mut procs[i].cpu_hist, 100.0 * ((stat.utime+stat.stime) - _prev_duration) as f32 / ((cpu_total - sys_stats._cpu_total) as f32 / cpu_count as f32) as f32, config); // cpu percent time utilization
-
-        //log_data(&mut procs[i].cpu_hist, ((cpu_total - sys_stats._cpu_total) - ()) as f32 / (cpu_total - sys_stats._cpu_total) as f32 * 100.0, config); // cpu percent time utilization
-
         
 
         log_data(&mut procs[i].cpu_hist, ((stat.utime+stat.stime)/ticks_per_second()) as f32  / (uptime as f32 - (stat.starttime/ticks_per_second()) as f32) as f32, config); // cpu percent time utilization
 
-        
-
         let _prcio = match prc.io() {
-
             Ok(prcio) => {log_data(&mut procs[i].disk_hist, (prcio.write_bytes/(1024*1024)) as u32, config); // cpu percent time utilization
-
             },
-
             Err(_e) => {},
-
         };
 
         log_data(&mut procs[i].swap_hist, (stat.nswap /256) as u16, config); //swap in mb
 
-        
-
         let mut netsum:u32 = 0;
-
         let _devstatus = match prc.dev_status() {
-
             Err(_e) => {},
-
             Ok(devstatus) => {
-
                 for (_key, net_devstat) in devstatus.iter() {
-
                     netsum += (net_devstat.recv_bytes + net_devstat.sent_bytes) as u32;
-
                     total_net += net_devstat.recv_bytes + net_devstat.sent_bytes;
-
                 }
-
             }
-
         };
-
         log_data(&mut procs[i].net_hist, netsum, config); //network usage in kb
-
         procs[i]._prev_duration = stat.utime+stat.stime;
-
     }
 
     for i in (last_read+1)..(procs[procs.len() -1].pid+1 as u32) { // check if latest procs have ended
-
         if pid_table.contains_key(&(i.clone())) {
-
             if pid_table[&(i.clone())] < procs.len() as u16 {
-
                 procs.remove(pid_table[&(i.clone())] as usize);
-
             }
-
             pid_table.remove(&(i.clone()));
-
             if pid_table.contains_key(&i) {
-
                 println!("entry still exists");
-
-                }
-
+            }
         }
-
     }
-
-    // // check for any missed children procs assignment
-
-    // for entry in child_queue {
-
-    //     procs[ pid_table[&entry.0] as usize].children.push(entry.1 as u32); // add missing children 
-
-    // }
 
     if  procs.len() > proc_count as usize { // remove any extra processs at the end of the vector
-
         for i in (proc_count as usize) .. procs.len() {
-
             if i < procs.len() {
-
                 procs.remove(i);
-
             }
-
         }
 
     }
-
-
-
     // UPDATE SYSTEM DATA
-
     sys_stats.uptime = uptime;
-
     let meminfo = Meminfo::new().unwrap();
-
     sys_stats.mem_total = (meminfo.mem_total as u64 / (1024*1024) as u64) as u32;
-
     log_data(&mut sys_stats.cpu_hist, cpus_usage.clone(), config);
-
     log_data(&mut sys_stats.ram_hist ,sys_stats.mem_total -  ((meminfo.mem_free) / (1024*1024)) as u32, config);
 
     let mut sum = 0;
@@ -362,7 +255,6 @@ pub fn update_procs(_pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>
     let model_name = cpuinfo.lines().find(|line| line.starts_with("model name")).unwrap_or_default();
     let model_name = model_name.split(":").nth(1).unwrap_or_default().trim();
     sys_stats.cpu_name = (*model_name).to_string();
-    //sys_stats._cpu_total = cpu_total;
 
     //copy new pid table
     _pid_table.clear();
@@ -394,12 +286,9 @@ pub fn record_prc(procs: &mut Vec<Process>, pid_table: &mut HashMap<u32, u16>, p
     println!("Recording process {}:{}...", pid, procs[pid_table[&pid] as usize].name);
     println!("Recording to 'HOME/.local/share/pctrl/pctrl_{}.plog'", pid);
     println!("Press <ctrl+c> to stop recording.");
-    //let prc = &procs[pid_table[&pid] as usize];
-    // let mut which_file: bool = false;
     let mut counter = 0;
     let mut stopped = false;
     let mut i =0;
-    //while recording_procs.iter().any(|e| pid.contains(e)) && unsafe{!PAUSE_REC} {
     writeln!(file, "Name  Owner  State  CPU  MEM  DISK  SWAP  timestamp").unwrap();
     while recording_procs.contains(&pid) && unsafe{*PAUSE_REC.get_mut() == false} {
         unsafe{update_procs(&mut _PID_TABLE, &mut _PROCESSES, &mut _SYS_STATS, *_CONFIG);} //REMOVE
@@ -413,9 +302,6 @@ pub fn record_prc(procs: &mut Vec<Process>, pid_table: &mut HashMap<u32, u16>, p
                 let def32:u32 =0;
                 let def16:u16 = 0;
                 let timestamp: DateTime<Utc> = DateTime::from_utc(Local::now().naive_utc(), Utc);
-                /*println!("{}", format!("{} {} {:?} {} {} {} {} {} {}", p.name, p.owner, 
-                p.state.procstate, p.cpu_hist.front().unwrap(), p.ram_hist.front().unwrap_or(&def32), 
-                p.disk_hist.front().unwrap_or(&def32), p.net_hist.front().unwrap_or(&def32), p.swap_hist.front().unwrap_or(&def16), timestamp.format("%d/%m/%Y %H:%M:%S")));*/
                 writeln!(file, "{}", format!("{} {} {} {} {} {} {} {}", p.name, p.owner, 
                 p.state, p.cpu_hist.front().unwrap(), p.ram_hist.front().unwrap_or(&def32), 
                 p.disk_hist.front().unwrap_or(&def32), p.swap_hist.front().unwrap_or(&def16), timestamp.format("%d/%m/%Y %H:%M:%S"))).unwrap();
@@ -423,14 +309,12 @@ pub fn record_prc(procs: &mut Vec<Process>, pid_table: &mut HashMap<u32, u16>, p
             }, // writing using the macro 'writeln!'
             None => {
                 writeln!(file, "-Process Exited-").unwrap();
-                //println!("-Process Exited-");
                 stopped = true
             },
         }
         if !stopped {
             counter += 1;
             if counter > config.max_rec_limit {
-                // remove from beginning of file
                 file.seek(SeekFrom::Start(0)).unwrap();
                 counter = 0;
             }
@@ -496,11 +380,11 @@ pub fn save_config() -> Result<(), std::io::Error> {
         .open(file_name)?;
     let config : Config = unsafe {_CONFIG.clone()};
 
-    writeln!(file, "{}\n{}\n{}\n{}", config.record_length, config.update_every, config.max_rec_limit, config.current_column.as_str());    
+    let _ =writeln!(file, "{}\n{}\n{}\n{}", config.record_length, config.update_every, config.max_rec_limit, config.current_column.as_str());    
     let filters = unsafe{_FILTERS.clone()};
     
     for filter in filters {
-        writeln!(file, "{}|{}|{}", filter.column, filter.value, filter.filter_type);                    
+        let _ = writeln!(file, "{}|{}|{}", filter.column, filter.value, filter.filter_type);                    
     };
             
     Ok(())
@@ -523,23 +407,9 @@ pub fn keep_alive(_pid: u32) {
     while running  {        
         
         if unsafe{ !_PID_TABLE.contains_key(&pid)} {
-            //println!("cmd is {}", cmd);
-            // let parts = cmd.split(" ").collect::<Vec<&str>>();
-            // let args = &cmd[parts[0].len()..];
             let _output = Command::new("gnome-terminal")
             .args(&["--tab", "--", "bash", "-c", cmd.clone().as_str()])
             .output().expect("Failed to restart process");
-            // let output = Command::new("/bin/sh")
-            // .arg("-c")
-            // .arg(cmd.clone())
-            // .stdout(Stdio::piped())
-            // .spawn()
-            // //.output()
-            // .expect("Failed to restart process");
-            
-            //println!("output: {:?}", output);
-
-            //Command::new(parts[0]).arg(args).output().expect("Failed to restart process");
             unsafe {
                 update_procs(&mut _PID_TABLE, &mut _PROCESSES, &mut _SYS_STATS, *_CONFIG);
                 for i in (0 .. _PROCESSES.len()).rev()  {
@@ -562,9 +432,6 @@ pub fn keep_alive(_pid: u32) {
         unsafe{
             update_procs(&mut _PID_TABLE, &mut _PROCESSES, &mut _SYS_STATS, *_CONFIG);
         }
-
-       //print!("\r");
-
     }
 }
 

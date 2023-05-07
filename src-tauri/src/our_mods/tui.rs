@@ -25,7 +25,7 @@ use super::proc_functions::*;
 
 
 static mut SHOW_TREE: bool = false;
-static mut tree_open: bool = false;
+static mut TREE_OPEN: bool = false;
 
 // function to update the table view in the TUI
 fn update_views(siv: &mut Cursive, procs: &mut Vec<Process>, pid_table: &mut HashMap<u32, u16>, sys_stats: &mut SysStats, config: Config, counter: u32) {
@@ -98,7 +98,7 @@ pub fn display_tui(columns_to_display: Vec<String>) {
 
     // We can quit by pressing `q`
     siv.add_global_callback('q', |s| {
-        unsafe{*TUI_Running.get_mut() = false;}
+        unsafe{*TUI_RUNNING.get_mut() = false;}
         s.quit();
     });
     
@@ -208,7 +208,7 @@ pub fn display_tui(columns_to_display: Vec<String>) {
     });
 
     siv.add_global_callback('t',   |s| {
-        if unsafe {tree_open} {
+        if unsafe {TREE_OPEN} {
             let mut pid = 1;
             s.call_on_name("treetable", |view: &mut TableView<Process, BasicColumn>| {
                 let selected_row = view.item().unwrap() as usize;
@@ -230,13 +230,13 @@ pub fn display_tui(columns_to_display: Vec<String>) {
             });
             s.pop_layer();
             unsafe {
-                tree_open = false;
+                TREE_OPEN = false;
                 SHOW_TREE = false;
             }
         }
         else {
             unsafe{
-                tree_open = true;
+                TREE_OPEN = true;
                 SHOW_TREE = true;
             }
             let mut pid = 0;
@@ -293,7 +293,7 @@ pub fn display_tui(columns_to_display: Vec<String>) {
                         });
                         s.pop_layer();
                         unsafe {
-                            tree_open = false;
+                            TREE_OPEN = false;
                             SHOW_TREE = false;
                         }
                     }),
@@ -548,11 +548,6 @@ pub fn display_tui(columns_to_display: Vec<String>) {
             pid = selected_item.pid;
             selected_item
         }).unwrap();
-        // s.call_on_name("table", |view: &mut TableView<Process, BasicColumn>| {
-        //     let selected_row: usize = view.item().unwrap() as usize;
-        //     let selected_item = view.borrow_item(selected_row).unwrap().clone();
-        //     pid = selected_item.pid;
-        // });
         let success = kill_processes_recursively(&selected_item);
         if success {
             s.add_layer(
@@ -694,14 +689,12 @@ pub fn filter_process(procs: &mut Vec<Process>) -> Vec<Process> {
     if unsafe {SHOW_TREE == true} {
         //construct tree ordering:
         let mut i = 0;
-        let mut count = 0;
         while i < filtered_procs.len() { // remove any children
             if i >= filtered_procs.len() {
                 break;
             }
             if filtered_procs[i].parent_pid != 0 {
                 filtered_procs.remove(i);
-                count+=1;
                 continue;
             }
             i += 1;

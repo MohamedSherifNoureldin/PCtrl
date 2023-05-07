@@ -8,8 +8,10 @@ use tauri::{WindowEvent};
 fn get_processes() -> Vec<Process> {
    let processes_to_display: Vec<Process>;
    unsafe {
-      update_procs(&mut _PID_TABLE, &mut _PROCESSES, &mut _SYS_STATS, *_CONFIG);
-      processes_to_display = filter_process(&mut _PROCESSES);   
+      if *TUI_Running.get_mut() == false { // TUI will do the updating if it's running
+         update_procs(&mut _PID_TABLE, &mut _PROCESSES, &mut _SYS_STATS, *_CONFIG);
+         processes_to_display = filter_process(&mut _PROCESSES);   
+      }
    }
    processes_to_display
 }

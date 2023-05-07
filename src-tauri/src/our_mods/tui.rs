@@ -17,7 +17,6 @@ use cursive::CursiveExt;
 use cursive::align::HAlign;
 use cursive::traits::*;
 use std::cmp::Ordering;
-extern crate cursive_tree_view;
 extern crate cursive_table_view;
 
 use super::structures::*;

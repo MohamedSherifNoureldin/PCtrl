@@ -189,7 +189,7 @@ pub fn update_procs(_pid_table: &mut HashMap<u32, u16>, procs: &mut Vec<Process>
         procs[i].priority = stat.priority as u8;
         procs[i].start_time = stat.starttime().unwrap();
         procs[i].dir = prc.exe().unwrap_or_default();
-        procs[i].owner = get_user_by_uid(prc.uid().unwrap_or(0)).unwrap_or(0).name().to_str().unwrap_or("Unidentified").to_string();
+        procs[i].owner = get_user_by_uid(prc.uid().unwrap()).unwrap_or(0).name().to_str().unwrap_or("Unidentified").to_string();
         procs[i].group = get_group_by_gid(stat.pgrp as u32).unwrap_or(Group::new(0, "none")).name().to_str().unwrap_or("Unidentified").to_string();
         match prc.fd_count() {
             Ok(_fdcount) => {procs[i].open_fds = _fdcount as u16; // only for root user

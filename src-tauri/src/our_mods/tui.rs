@@ -309,7 +309,7 @@ pub fn display_tui(columns_to_display: Vec<String>) {
         let mut pid = 0;
         s.call_on_name("table", |view: &mut TableView<Process, BasicColumn>| {
             let selected_row: usize = view.item().unwrap_or(0) as usize;
-            let selected_item = view.borrow_item(selected_row).unwrap_or_default().clone();
+            let selected_item = view.borrow_item(selected_row).unwrap().clone();
             pid = selected_item.pid;
         });
         let success = pause_process(pid);

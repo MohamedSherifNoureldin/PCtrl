@@ -226,7 +226,9 @@ pub fn display_tui(columns_to_display: Vec<String>) {
                 i+=1;
             }
             s.call_on_name("table", |view: &mut TableView<Process, BasicColumn>| {
-                view.set_selected_item(selindex);
+                if i < unsafe{_PROCESSES.len()} {
+                    view.set_selected_item(selindex);
+                }
             });
             s.pop_layer();
             unsafe {
@@ -291,7 +293,9 @@ pub fn display_tui(columns_to_display: Vec<String>) {
                             i+=1;
                         }
                         s.call_on_name("table", |view: &mut TableView<Process, BasicColumn>| {
-                            view.set_selected_item(selindex);
+                            if i < unsafe{_PROCESSES.len()} {
+                                view.set_selected_item(selindex);
+                            }
                         });
                         s.pop_layer();
                         unsafe {

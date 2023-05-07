@@ -712,8 +712,8 @@ pub fn filter_process(procs: &mut Vec<Process>) -> Vec<Process> {
             let child_list = filtered_procs[i].children.clone();
             filtered_procs[i].index = i as u32;
             for child in child_list { 
-                if unsafe{_PID_TABLE.contains(child)} {
-                    if unsafe{_PID_TABLE[&child] >= procs.len()} {
+                if unsafe{_PID_TABLE.contains_key(&child)} {
+                    if unsafe{_PID_TABLE[&child] as usize >= procs.len()} {
                         continue;
                     }
                     saved_i += 1;

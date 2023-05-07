@@ -6,7 +6,7 @@ use tauri::{WindowEvent};
 
 #[tauri::command]
 fn get_processes() -> Vec<Process> {
-   let processes_to_display: Vec<Process> = Vec::new();
+   let mut processes_to_display: Vec<Process> = Vec::new();
    unsafe {
       if *TUI_Running.get_mut() == false { // TUI will do the updating if it's running
          update_procs(&mut _PID_TABLE, &mut _PROCESSES, &mut _SYS_STATS, *_CONFIG);

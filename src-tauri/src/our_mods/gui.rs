@@ -58,15 +58,6 @@ fn get_system_info() -> SysStats {
 
 pub fn display_gui() {
    tauri::Builder::default()
-   .on_window_event(move |event| match event.event() {
-      WindowEvent::CloseRequested { api, .. } => {
-        if unsafe{*TUI_Running.get_mut() == true} {
-         println!("Quit the backend first!");
-         api.prevent_close();
-        }        
-      }
-      _ => {}
-    })
       .invoke_handler(tauri::generate_handler![get_processes, kill_process, kill_processes_recursively, pause_process, resume_process, get_system_info, change_priority_process])
       .run(tauri::generate_context!())
       .expect("error while running tauri application");

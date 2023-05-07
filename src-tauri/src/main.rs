@@ -16,6 +16,7 @@ use std::io::prelude::*;
 use std::fs::File;
 extern crate dirs;
 use std::thread;
+use std::process;
 
 
 // main function
@@ -198,10 +199,10 @@ fn main() {
         Some(("gui", _)) => {
             let col_to_disp = columns_to_display.clone();
             //run tui as thread (closes when GUI is closed)
-            let _tui = thread::spawn(move || {
-                display_tui(col_to_disp);
-            });
-            unsafe{*TUI_Running.get_mut() = true;}
+            let tui = process::Command::new("gnome-terminal")
+            .args(&["--tab", "--", "bash", "-c", "pctrl"])
+            .output().expect("Failed to start pctrl");
+            //unsafe{*TUI_Running.get_mut() = true;}
             display_gui();
             // wait for tui to end if display_gui fails
             //tui.join().unwrap(); 

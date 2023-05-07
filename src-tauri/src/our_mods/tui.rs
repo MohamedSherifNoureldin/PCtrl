@@ -210,14 +210,15 @@ pub fn display_tui(columns_to_display: Vec<String>) {
     siv.add_global_callback('t',   |s| {
         if unsafe {TREE_OPEN} {
             let mut pid = 1;
+            let tree_procs = unsafe{filter_process(&mut _PROCESSES)};
             s.call_on_name("treetable", |view: &mut TableView<Process, BasicColumn>| {
-                let selected_row = view.item().unwrap() as usize;
-                let selected_item = view.borrow_item(selected_row).unwrap().clone();
+                let selected_row = view.item().unwrap_or(0) as usize;
+                let selected_item = view.borrow_item(selected_row).unwrap_or_default().clone();
                 pid = selected_item.pid;
             });
             let mut i = 0;
             let mut selindex = 0;
-            let tree_procs = unsafe{filter_process(&mut _PROCESSES)};
+            
             for p in tree_procs.clone() {
                 if p.pid == pid {
                     selindex = i;
@@ -240,13 +241,14 @@ pub fn display_tui(columns_to_display: Vec<String>) {
                 SHOW_TREE = true;
             }
             let mut pid = 0;
+            let tree_procs = unsafe{filter_process(&mut _PROCESSES)};
             s.call_on_name("table", |view: &mut TableView<Process, BasicColumn>| {
-                let selected_row = view.item().unwrap() as usize;
-                let selected_item = view.borrow_item(selected_row).unwrap().clone();
+                let selected_row = view.item().unwrap_or(0) as usize;
+                let selected_item = view.borrow_item(selected_row).unwrap_or_default().clone();
                 pid = selected_item.pid;
             });
             let mut tree: TableView<Process, BasicColumn> = TableView::<Process, BasicColumn>::new();
-            let tree_procs = unsafe{filter_process(&mut _PROCESSES)};
+            
             let mut selindex = 0;
             let mut i = 0;
             for p in tree_procs.clone() {
@@ -273,14 +275,15 @@ pub fn display_tui(columns_to_display: Vec<String>) {
                     .title("Process Tree")
                     .button("Close", |s| {
                         let mut pid = 1;
+                        let tree_procs = unsafe{filter_process(&mut _PROCESSES)};
                         s.call_on_name("treetable", |view: &mut TableView<Process, BasicColumn>| {
-                            let selected_row = view.item().unwrap() as usize;
-                            let selected_item = view.borrow_item(selected_row).unwrap().clone();
+                            let selected_row = view.item().unwrap_or(0) as usize;
+                            let selected_item = view.borrow_item(selected_row).unwrap_or_default().clone();
                             pid = selected_item.pid;
                         });
                         let mut i = 0;
                         let mut selindex = 0;
-                        let tree_procs = unsafe{filter_process(&mut _PROCESSES)};
+                        
                         for p in tree_procs.clone() {
                             if p.pid == pid {
                                 selindex = i;
@@ -306,8 +309,8 @@ pub fn display_tui(columns_to_display: Vec<String>) {
     siv.add_global_callback('p',   |s| {
         let mut pid = 0;
         s.call_on_name("table", |view: &mut TableView<Process, BasicColumn>| {
-            let selected_row: usize = view.item().unwrap() as usize;
-            let selected_item = view.borrow_item(selected_row).unwrap().clone();
+            let selected_row: usize = view.item().unwrap_or(0) as usize;
+            let selected_item = view.borrow_item(selected_row).unwrap_or_default().clone();
             pid = selected_item.pid;
         });
         let success = pause_process(pid);

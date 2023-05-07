@@ -712,23 +712,28 @@ pub fn filter_process(procs: &mut Vec<Process>) -> Vec<Process> {
             let child_list = filtered_procs[i].children.clone();
             filtered_procs[i].index = i as u32;
             for child in child_list { 
-                saved_i += 1;
-                filtered_procs.insert(saved_i,  procs[unsafe {_PID_TABLE[&child] as usize } ].clone()); 
-                let mut parent_spaces: String = String::new();
-                for letter in filtered_procs[i].name.chars() {
-                    if letter == ' ' || letter == '-' || letter == '>' {
-                        parent_spaces += " ";
+                if unsafe{_PID_TABLE.contains(child)} {
+                    if unsafe{_PID_TABLE[&child] >= procs.len()} {
+                        continue;
                     }
-                    else if letter == '|' {
-                        parent_spaces += "|";
+                    saved_i += 1;
+                    filtered_procs.insert(saved_i,  procs[unsafe {_PID_TABLE[&child] as usize } ].clone()); 
+                    let mut parent_spaces: String = String::new();
+                    for letter in filtered_procs[i].name.chars() {
+                        if letter == ' ' || letter == '-' || letter == '>' {
+                            parent_spaces += " ";
+                        }
+                        else if letter == '|' {
+                            parent_spaces += "|";
+                        }
+                        else {
+                            break;
+                        }
                     }
-                    else {
-                        break;
-                    }
+                    let name = filtered_procs[saved_i].name.clone();
+                    filtered_procs[saved_i].name = format!("{}|--> {}", parent_spaces, name);
+                    assert_eq!(filtered_procs[saved_i].parent_pid, filtered_procs[i].pid);
                 }
-                let name = filtered_procs[saved_i].name.clone();
-                filtered_procs[saved_i].name = format!("{}|--> {}", parent_spaces, name);
-                assert_eq!(filtered_procs[saved_i].parent_pid, filtered_procs[i].pid);
             }
             i += 1;
         }

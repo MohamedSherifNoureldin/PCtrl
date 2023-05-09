@@ -150,3 +150,7 @@ demo/GUI.gif
             - `tui.rs` contains the code for the cursive TUI
             - `proc_functions.rs` contains the code for the functions that read and parse the process information from the system as well as the functions that manipulate processes.
             - `structures.rs` contains the code for the structures needed across the project
+
+## Authors
+- Mohamed Sherif  - https://github.com/MohamedSherifNoureldin
+- Ali Eissa - https://github.com/Spospider

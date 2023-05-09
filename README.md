@@ -154,3 +154,4 @@ demo/GUI.gif
 ## Authors
 - Mohamed Sherif  - https://github.com/MohamedSherifNoureldin
 - Ali Eissa - https://github.com/Spospider
+- Youssef Magdy - https://github.com/youssefmagdy99

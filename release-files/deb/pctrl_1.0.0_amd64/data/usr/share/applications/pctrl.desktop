@@ -1,0 +1,8 @@
+[Desktop Entry]
+Categories=
+Comment=A powerful process manager with both a GUI and a TUI
+Exec=pctrl
+Icon=pctrl
+Name=pctrl
+Terminal=false
+Type=Application

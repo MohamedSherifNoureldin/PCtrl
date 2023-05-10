@@ -1,0 +1,9 @@
+Package: pctrl
+Version: 1.0.0
+Architecture: amd64
+Installed-Size: 13920
+Maintainer: Mohamed Sherif, Ali Eissa, Youssef Fares
+Depends: libwebkit2gtk-4.0-37, libgtk-3-0
+Description: A powerful process manager with both a GUI and a TUI
+ (none)
+Priority: optional

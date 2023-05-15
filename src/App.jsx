@@ -105,7 +105,8 @@ function App() {
           procRes.forEach((process) => {
             const processName = process.name;
             const cpuHist = process.cpu_hist;
-            const cpuUsage = cpuHist[0]*systemAvgCPU*100;
+            const cpuUsage = Math.round( (cpuHist[0]*systemAvgCPU*100) * 1e2 ) / 1e2;
+            
 
             // If the process's cpu usage is greater than 5%, add it to the total cpu usage object
             if (cpuUsage > 5) {
@@ -120,11 +121,11 @@ function App() {
 
           // Add the total cpu usage of other processes to the total cpu usage object
           if (otherProcessesCpuUsage > 0) {
-            totalCpuUsage['Other Processes'] = otherProcessesCpuUsage;
+            totalCpuUsage['Other Processes'] = Math.round( otherProcessesCpuUsage * 1e2 ) / 1e2;
           }
 
           // // Add the total cpu usage of the system to the total cpu usage object
-          totalCpuUsage['Free CPU'] = 100 - totalUsedCpu;
+          totalCpuUsage['Free CPU'] = Math.round( (100 - totalUsedCpu) * 1e2 ) / 1e2 ;
 
           // Convert the total cpu usage object to an array of objects with the desired format
           const cpuUsageDataPieChart = Object.keys(totalCpuUsage).map((processName) => {
@@ -154,7 +155,7 @@ function App() {
           procRes.forEach((process) => {
             const processName = process.name;
             const ramHist = process.ram_hist;
-            const memUsage = ramHist[0]*100/systemRes.mem_total;
+            const memUsage = Math.round( (ramHist[0]*100/systemRes.mem_total) * 1e2 ) / 1e2;
   
             // If the process's memory usage is greater than 5%, add it to the total memory usage object
             if (memUsage > 5) {
@@ -169,11 +170,11 @@ function App() {
   
           // Add the total memory usage of other processes to the total memory usage object
           if (otherProcessesMemUsage > 0) {
-            totalMemUsage['Other Processes'] = otherProcessesMemUsage;
+            totalMemUsage['Other Processes'] = Math.round( otherProcessesMemUsage * 1e2 ) / 1e2;
           }
   
           // Add the total memory usage of the system to the total memory usage object
-          totalMemUsage['Free Memory'] = 100 - totalUsedMemory;
+          totalMemUsage['Free Memory'] = Math.round( (100 - totalUsedMemory) * 1e2 ) / 1e2 ;
 
           // Convert the total memory usage object to an array of objects with the desired format
           const memUsageDataPieChart = Object.keys(totalMemUsage).map((processName) => ({
@@ -184,7 +185,7 @@ function App() {
           setMemUsageDataPieChart(memUsageDataPieChart);
         })
   
-      });
+      });someNumber
 
     }, MINUTE_MS);
   
